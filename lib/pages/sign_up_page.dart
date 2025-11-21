@@ -77,7 +77,7 @@ class _SignUpPageState extends State<SignUpPage> {
       // 4. Go to main app
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const app.MyApp()),
+        MaterialPageRoute(builder: (_) => const app.RootPage()),
         (route) => false,
       );
     } catch (e) {

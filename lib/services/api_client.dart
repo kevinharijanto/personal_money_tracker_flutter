@@ -2,16 +2,25 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
 import '../storage/auth_storage.dart';
 import 'cache_service.dart';
 import '../pages/login_page.dart';
+import '../config/api_config.dart';
+import '../utils/api_error.dart';
 
 class ApiClient {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(debugLabel: 'ApiClientNavigatorKey');
-  static const String baseUrl = 'http://192.168.18.129:7777';
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'ApiClientNavigatorKey');
+
+  static const String baseUrl = ApiConfig.baseUrl;
+
   static final CacheService _cache = CacheService();
+
+  /// Keeps track of identical in-flight GET requests (by cache key)
   static final Map<String, Future<http.Response>> _inFlightRequests = {};
 
+  /// Build base headers (Authorization, Household, etc.)
   static Future<Map<String, String>> _buildHeaders() async {
     final token = await AuthStorage.getToken();
     final householdId = await AuthStorage.getHouseholdId();
@@ -31,14 +40,20 @@ class ApiClient {
     return headers;
   }
 
-  static Future<http.Response> get(String endpoint, {bool useCache = true, Duration? cacheExpiration}) async {
-    // Check if there's already an identical request in flight
+  /// GET with optional caching + in-flight de-duplication
+  static Future<http.Response> get(
+    String endpoint, {
+    bool useCache = true,
+    Duration? cacheExpiration,
+  }) async {
     final requestKey = CacheService.generateKey(endpoint, null);
+
+    // Reuse in-flight request if identical
     if (_inFlightRequests.containsKey(requestKey)) {
       return _inFlightRequests[requestKey]!;
     }
 
-    // Check cache first (only for GET requests)
+    // Read from cache first
     if (useCache) {
       final cachedResponse = _cache.get<http.Response>(requestKey);
       if (cachedResponse != null) {
@@ -46,96 +61,128 @@ class ApiClient {
       }
     }
 
-    // Create the request
+    // Create the actual request
     final requestFuture = _executeGetRequest(endpoint);
     _inFlightRequests[requestKey] = requestFuture;
 
     try {
       final response = await requestFuture;
-      
+
+      // Centralized status + error handling
+      final processed = _handleResponse(
+        endpoint: endpoint,
+        response: response,
+        invalidateRelatedCache: false, // GET does not invalidate anything
+      );
+
       // Cache successful responses
-      if (useCache && response.statusCode >= 200 && response.statusCode < 300) {
-        _cache.put(requestKey, response, expiration: cacheExpiration);
+      if (useCache) {
+        _cache.put(requestKey, processed, expiration: cacheExpiration);
       }
-      
-      return response;
+
+      return processed;
     } finally {
-      // Clean up in-flight request
       _inFlightRequests.remove(requestKey);
     }
   }
 
+  /// Internal low-level GET (no error handling here)
   static Future<http.Response> _executeGetRequest(String endpoint) async {
     final headers = await _buildHeaders();
     final uri = Uri.parse('$baseUrl$endpoint');
-    final response = await http.get(uri, headers: headers);
-    _handleAuthError(response);
-    return response;
+    return http.get(uri, headers: headers);
   }
 
+  /// POST with centralized error handling + cache invalidation
   static Future<http.Response> post(
     String endpoint,
     Map<String, dynamic> body,
   ) async {
     final headers = await _buildHeaders();
     final uri = Uri.parse('$baseUrl$endpoint');
+
     final response = await http.post(
       uri,
       headers: headers,
       body: jsonEncode(body),
     );
-    
-    _handleAuthError(response);
-    
-    // Invalidate related cache entries after successful POST
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      _invalidateRelatedCache(endpoint);
-    }
-    
-    return response;
+
+    return _handleResponse(
+      endpoint: endpoint,
+      response: response,
+      invalidateRelatedCache: true,
+    );
   }
 
+  /// PUT with centralized error handling + cache invalidation
   static Future<http.Response> put(
     String endpoint,
     Map<String, dynamic> body,
   ) async {
     final headers = await _buildHeaders();
     final uri = Uri.parse('$baseUrl$endpoint');
+
     final response = await http.put(
       uri,
       headers: headers,
       body: jsonEncode(body),
     );
-    
-    _handleAuthError(response);
-    
-    // Invalidate related cache entries after successful PUT
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      _invalidateRelatedCache(endpoint);
-    }
-    
-    return response;
+
+    return _handleResponse(
+      endpoint: endpoint,
+      response: response,
+      invalidateRelatedCache: true,
+    );
   }
 
+  /// DELETE with centralized error handling + cache invalidation
   static Future<http.Response> delete(String endpoint) async {
     final headers = await _buildHeaders();
     final uri = Uri.parse('$baseUrl$endpoint');
+
     final response = await http.delete(uri, headers: headers);
-    
-    _handleAuthError(response);
-    
-    // Invalidate related cache entries after successful DELETE
-    if (response.statusCode >= 200 && response.statusCode < 300) {
+
+    return _handleResponse(
+      endpoint: endpoint,
+      response: response,
+      invalidateRelatedCache: true,
+    );
+  }
+
+  /// Central place to:
+  /// - Handle 401 (auth error + redirect)
+  /// - Extract clean error messages via ApiErrorUtils
+  /// - Invalidate cache for mutating requests
+  static http.Response _handleResponse({
+    required String endpoint,
+    required http.Response response,
+    required bool invalidateRelatedCache,
+  }) {
+    final status = response.statusCode;
+
+    // 401 → auth expired / invalid
+    if (status == 401) {
+      _handleAuthError(response);
+      throw Exception('Unauthorized. Please log in again.');
+    }
+
+    // Non-2xx → error; extract message consistently
+    if (status < 200 || status >= 300) {
+      final msg = ApiErrorUtils.extractMessage(response);
+      throw Exception(msg);
+    }
+
+    // Successful mutation → invalidate related cache
+    if (invalidateRelatedCache) {
       _invalidateRelatedCache(endpoint);
     }
-    
+
     return response;
   }
 
-  /// Invalidate cache entries related to the modified endpoint
+  /// Invalidate cache entries related to the modified endpoint.
+  /// For now we just clear everything (simple & safe).
   static void _invalidateRelatedCache(String endpoint) {
-    // Clear all cache for simplicity - in a more sophisticated implementation,
-    // we could selectively invalidate only related endpoints
     _cache.clear();
   }
 
@@ -152,19 +199,17 @@ class ApiClient {
 
   /// Handle authentication errors and redirect to login
   static void _handleAuthError(http.Response response) {
-    if (response.statusCode == 401) {
-      // Clear stored authentication data
-      AuthStorage.clear();
-      
-      // Navigate to login page
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (navigatorKey.currentContext != null) {
-          Navigator.of(navigatorKey.currentContext!).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-            (route) => false,
-          );
-        }
-      });
-    }
+    // Optionally inspect response.body here if needed
+    AuthStorage.clear();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    });
   }
 }

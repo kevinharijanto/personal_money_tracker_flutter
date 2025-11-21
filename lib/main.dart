@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
-            title: 'Money Tracker',
+            title: 'ApliGaji',
             theme: themeProvider.themeData,
             navigatorKey: ApiClient.navigatorKey,
             home: const RootPage(),

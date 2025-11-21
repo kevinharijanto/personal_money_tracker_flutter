@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import '../utils/api_error.dart';
 
 class LoginResponse {
   final String token;
@@ -12,7 +14,7 @@ class LoginResponse {
 }
 
 class AuthService {
-  static const String _baseUrl = 'http://192.168.18.129:7777';
+  static const String _baseUrl = ApiConfig.baseUrl;
 
   Future<LoginResponse> login({
     required String email,
@@ -38,8 +40,9 @@ class AuthService {
 
       return LoginResponse(token: token, user: user);
     } else {
-      // You can improve error handling later
-      throw Exception('Login failed: ${response.statusCode} ${response.body}');
+      // Use the same error handling pattern as ApiClient
+      final msg = ApiErrorUtils.extractMessage(response);
+      throw Exception(msg);
     }
   }
 }

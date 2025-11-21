@@ -7,28 +7,20 @@ class TransactionService {
   Future<List<TransactionModel>> fetchTransactions({bool useCache = true}) async {
     final http.Response res = await ApiClient.get('/api/transactions', useCache: useCache);
 
-    if (res.statusCode == 200) {
-      final List<dynamic> jsonList = jsonDecode(res.body) as List<dynamic>;
-      return jsonList
-          .map((item) => TransactionModel.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } else {
-      throw Exception('Transactions API error: ${res.body}');
-    }
+    final List<dynamic> jsonList = jsonDecode(res.body) as List<dynamic>;
+    return jsonList
+        .map((item) => TransactionModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<TransactionModel>> fetchTransactionsForAccount(String accountId, {bool useCache = true}) async {
     final http.Response res =
         await ApiClient.get('/api/transactions?accountId=$accountId', useCache: useCache);
 
-    if (res.statusCode == 200) {
-      final List<dynamic> jsonList = jsonDecode(res.body) as List<dynamic>;
-      return jsonList
-          .map((item) => TransactionModel.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } else {
-      throw Exception('Transactions API error: ${res.body}');
-    }
+    final List<dynamic> jsonList = jsonDecode(res.body) as List<dynamic>;
+    return jsonList
+        .map((item) => TransactionModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<TransactionModel>> fetchTransactionsForAccountWithDateRange(
@@ -59,28 +51,19 @@ class TransactionService {
     
     final http.Response res = await ApiClient.get(url, useCache: useCache);
     
-
-    if (res.statusCode == 200) {
-      final List<dynamic> jsonList = jsonDecode(res.body) as List<dynamic>;
-      return jsonList
-          .map((item) => TransactionModel.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } else {
-      throw Exception('Transactions API error: ${res.body}');
-    }
+    final List<dynamic> jsonList = jsonDecode(res.body) as List<dynamic>;
+    return jsonList
+        .map((item) => TransactionModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// 🔹 NEW: get a single transaction by ID
   Future<TransactionModel> fetchTransactionById(String id) async {
     final http.Response res = await ApiClient.get('/api/transactions/$id');
 
-    if (res.statusCode == 200) {
-      final Map<String, dynamic> jsonMap =
-          jsonDecode(res.body) as Map<String, dynamic>;
-      return TransactionModel.fromJson(jsonMap);
-    } else {
-      throw Exception('Transaction detail error: ${res.body}');
-    }
+    final Map<String, dynamic> jsonMap =
+        jsonDecode(res.body) as Map<String, dynamic>;
+    return TransactionModel.fromJson(jsonMap);
   }
 
     /// Create a new transaction
@@ -105,19 +88,7 @@ class TransactionService {
     }
 
     // POST /api/transactions
-    final res = await ApiClient.post('/api/transactions', body);
-
-    // If ApiClient.post returns http.Response:
-    if (res is dynamic && res.statusCode != null) {
-      if (res.statusCode != 200 && res.statusCode != 201) {
-        throw Exception('Failed to create transaction: ${res.body}');
-      }
-      // we ignore the body; no casting / decoding → no type error
-      return;
-    }
-
-    // If ApiClient.post returns already-decoded JSON or something else,
-    // we don't care about the result for now, only that it didn't throw.
+    await ApiClient.post('/api/transactions', body);
   }
 
   /// Update an existing transaction
@@ -143,27 +114,13 @@ class TransactionService {
     }
 
     // PUT /api/transactions/YOUR_TRANSACTION_ID
-    final res = await ApiClient.put('/api/transactions/$transactionId', body);
-
-    if (res is dynamic && res.statusCode != null) {
-      if (res.statusCode != 200 && res.statusCode != 204) {
-        throw Exception('Failed to update transaction: ${res.body}');
-      }
-      return;
-    }
+    await ApiClient.put('/api/transactions/$transactionId', body);
   }
 
   /// Delete a transaction
   Future<void> deleteTransaction(String transactionId) async {
     // DELETE /api/transactions/YOUR_TRANSACTION_ID
-    final res = await ApiClient.delete('/api/transactions/$transactionId');
-
-    if (res is dynamic && res.statusCode != null) {
-      if (res.statusCode != 200 && res.statusCode != 204) {
-        throw Exception('Failed to delete transaction: ${res.body}');
-      }
-      return;
-    }
+    await ApiClient.delete('/api/transactions/$transactionId');
   }
 
   /// Create a new transfer
@@ -196,31 +153,12 @@ class TransactionService {
     }
 
     // POST /api/transfers
-    final res = await ApiClient.post('/api/transfers', body);
-
-    // If ApiClient.post returns http.Response:
-    if (res is dynamic && res.statusCode != null) {
-      if (res.statusCode != 200 && res.statusCode != 201) {
-        throw Exception('Failed to create transfer: ${res.body}');
-      }
-      // we ignore the body; no casting / decoding → no type error
-      return;
-    }
-
-    // If ApiClient.post returns already-decoded JSON or something else,
-    // we don't care about result for now, only that it didn't throw.
+    await ApiClient.post('/api/transfers', body);
   }
 
   /// Delete a transfer (both transactions) using transfer group ID
   Future<void> deleteTransfer(String transferGroupId) async {
     // DELETE /api/transfers/YOUR_TRANSFER_GROUP_ID
-    final res = await ApiClient.delete('/api/transfers/$transferGroupId');
-
-    if (res is dynamic && res.statusCode != null) {
-      if (res.statusCode != 200 && res.statusCode != 204) {
-        throw Exception('Failed to delete transfer: ${res.body}');
-      }
-      return;
-    }
+    await ApiClient.delete('/api/transfers/$transferGroupId');
   }
 }

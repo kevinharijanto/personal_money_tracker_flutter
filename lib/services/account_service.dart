@@ -34,27 +34,9 @@ class AccountService {
 
     final res = await ApiClient.post('/api/accounts', body);
 
-    if (res.statusCode != 201 && res.statusCode != 200) {
-      String errorMessage = 'Failed to add account';
-      try {
-        final errorData = jsonDecode(res.body) as Map<String, dynamic>?;
-        if (errorData != null && errorData['message'] != null) {
-          errorMessage = errorData['message'] as String;
-        }
-      } catch (e) {
-        // If we can't parse the error, use the status code and body
-        errorMessage = 'Failed to add account (${res.statusCode}): ${res.body}';
-      }
-      throw Exception(errorMessage);
-    }
-
-    try {
-      final Map<String, dynamic> data =
-          jsonDecode(res.body) as Map<String, dynamic>;
-      return AccountModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Failed to parse account response: $e');
-    }
+    final Map<String, dynamic> data =
+        jsonDecode(res.body) as Map<String, dynamic>;
+    return AccountModel.fromJson(data);
   }
 
   /// PUT /api/accounts/YOUR_ACCOUNT_ID
@@ -77,36 +59,14 @@ class AccountService {
 
     final res = await ApiClient.put('/api/accounts/$accountId', body);
 
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      String errorMessage = 'Failed to update account';
-      try {
-        final errorData = jsonDecode(res.body) as Map<String, dynamic>?;
-        if (errorData != null && errorData['message'] != null) {
-          errorMessage = errorData['message'] as String;
-        }
-      } catch (e) {
-        // If we can't parse the error, use the status code and body
-        errorMessage = 'Failed to update account (${res.statusCode}): ${res.body}';
-      }
-      throw Exception(errorMessage);
-    }
-
-    try {
-      final Map<String, dynamic> data =
-          jsonDecode(res.body) as Map<String, dynamic>;
-      return AccountModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Failed to parse account response: $e');
-    }
+    final Map<String, dynamic> data =
+        jsonDecode(res.body) as Map<String, dynamic>;
+    return AccountModel.fromJson(data);
   }
 
   /// DELETE /api/accounts/YOUR_ACCOUNT_ID
   Future<void> deleteAccount(String accountId) async {
-    final res = await ApiClient.delete('/api/accounts/$accountId');
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to delete account: ${res.body}');
-    }
+    await ApiClient.delete('/api/accounts/$accountId');
   }
 
   /// PUT /api/accounts/reorder
@@ -118,10 +78,6 @@ class AccountService {
       'accountIds': accountIds,
     };
 
-    final res = await ApiClient.put('/api/accounts/reorder', body);
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to reorder accounts: ${res.body}');
-    }
+    await ApiClient.put('/api/accounts/reorder', body);
   }
 }

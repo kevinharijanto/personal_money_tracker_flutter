@@ -39,10 +39,6 @@ class UserService {
 
     final res = await ApiClient.post('/api/users', body);
 
-    if (res.statusCode != 201 && res.statusCode != 200) {
-      throw Exception('Failed to sign up: ${res.body}');
-    }
-
     final Map<String, dynamic> data = jsonDecode(res.body) as Map<String, dynamic>;
     return SignUpResponse.fromJson(data);
   }

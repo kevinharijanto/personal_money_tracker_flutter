@@ -26,10 +26,6 @@ class CategoryService {
   Future<List<CategoryModel>> fetchCategories(String type, {bool useCache = true}) async {
     final res = await ApiClient.get('/api/categories?type=$type', useCache: useCache);
 
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to load categories: ${res.body}');
-    }
-
     final List<dynamic> data = jsonDecode(res.body) as List<dynamic>;
     return data
         .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
@@ -48,11 +44,6 @@ class CategoryService {
     };
 
     final res = await ApiClient.post('/api/categories', body);
-
-    // Your API may return 201 Created or 200 OK
-    if (res.statusCode != 201 && res.statusCode != 200) {
-      throw Exception('Failed to add category: ${res.body}');
-    }
 
     final Map<String, dynamic> data =
         jsonDecode(res.body) as Map<String, dynamic>;
@@ -73,10 +64,6 @@ class CategoryService {
 
     final res = await ApiClient.put('/api/categories/$categoryId', body);
 
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to update category: ${res.body}');
-    }
-
     final Map<String, dynamic> data =
         jsonDecode(res.body) as Map<String, dynamic>;
     return CategoryModel.fromJson(data);
@@ -84,10 +71,6 @@ class CategoryService {
 
   /// DELETE /api/categories/YOUR_CATEGORY_ID
   Future<void> deleteCategory(String categoryId) async {
-    final res = await ApiClient.delete('/api/categories/$categoryId');
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Failed to delete category: ${res.body}');
-    }
+    await ApiClient.delete('/api/categories/$categoryId');
   }
 }
