@@ -1,9 +1,11 @@
 // lib/pages/home_page.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../storage/auth_storage.dart';
 import 'login_page.dart';
 import '../widgets/accounts_view.dart';
 import 'transaction_detail_page.dart';
+import '../state/accounts_state.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,7 +15,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _refreshToken = 0;
   String? _name;
   String? _email;
 
@@ -21,6 +22,11 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadUser();
+    // Trigger initial accounts load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final accountsState = context.read<AccountsState>();
+      accountsState.load(); // initial load (cached or fresh)
+    });
   }
 
   Future<void> _loadUser() async {
@@ -42,14 +48,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Called when *any* child page (AccountsView / AccountTransactionsPage)
-  /// reports that data has changed (e.g. a transaction was added/edited).
-  void _handleAccountsDataChanged() {
-    setState(() {
-      _refreshToken++; // triggers AccountsView to refetch account groups
-    });
-  }
-
   /// FAB → open add-transaction page from the main Accounts screen
   Future<void> _openNewTransaction() async {
     final changed = await Navigator.of(context).push(
@@ -62,7 +60,9 @@ class _HomePageState extends State<HomePage> {
 
     // If the detail page popped with `Navigator.pop(true)` → refresh accounts
     if (changed == true) {
-      _handleAccountsDataChanged();
+      if (!mounted) return;
+      final accountsState = context.read<AccountsState>();
+      await accountsState.refresh();
     }
   }
 
@@ -110,10 +110,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Expanded(
-            child: AccountsView(
-              refreshToken: _refreshToken,
-              onDataChanged: _handleAccountsDataChanged, // 🔥 important
-            ),
+            child: AccountsView(),
           ),
         ],
       ),

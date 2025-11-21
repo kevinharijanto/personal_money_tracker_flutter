@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../models/transaction.dart';
 import '../models/account_group.dart';
@@ -8,7 +9,8 @@ import '../services/category_service.dart';
 import '../services/account_group_service.dart';
 import '../services/api_client.dart';
 import '../utils/money_formatter.dart';
-import '../utils/refresh_notifier.dart';
+import '../state/accounts_state.dart';
+import '../state/transactions_state.dart';
 
 class TransactionDetailPage extends StatefulWidget {
   final String? transactionId;
@@ -102,10 +104,9 @@ class _AmountInputFormatter extends TextInputFormatter {
 }
 
 class _TransactionDetailPageState extends State<TransactionDetailPage> {
-  final TransactionService _txService = TransactionService();
   final CategoryService _categoryService = CategoryService();
   final AccountGroupService _accountService = AccountGroupService();
-  final RefreshNotifier _refreshNotifier = RefreshNotifier.instance;
+  final TransactionService _txService = TransactionService();
 
   TransactionModel? _tx;
 
@@ -170,9 +171,16 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       await _loadExistingTransaction();
     } else {
       _accountId = widget.initialAccountId;
-      _accountName = widget.initialAccountName;
+      // _accountName = widget.initialAccountName;
+      _accountName = null;
       _categoryId = widget.initialCategoryId;
       _categoryName = widget.initialCategoryName;
+
+      // 👇 IMPORTANT: if we came from "All Accounts", accountId will be null.
+      // Don't show "All Accounts" as if it's a selected account.
+      if (_accountId == null) {
+        _accountName = null; // this will make the UI show "Select account"
+      }
 
       if (_type == 'TRANSFER' && _accountId != null) {
         _fromAccountId = _accountId;
@@ -742,9 +750,11 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       // Convert local date to UTC at noon to avoid timezone issues
       final dateUtc = DateTime(_date.year, _date.month, _date.day, 12, 0, 0).toUtc();
       
+      final transactionsState = context.read<TransactionsState>();
+      
       if (_type == 'TRANSFER') {
         // Create transfer
-        await _txService.createTransfer(
+        await transactionsState.createTransfer(
           fromAccountId: _fromAccountId!,
           toAccountId: _toAccountId!,
           amount: amountDouble.toString(),
@@ -753,7 +763,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         );
       } else if (widget.isExisting) {
         // Update existing transaction
-        await _txService.updateTransaction(
+        await transactionsState.updateTransaction(
           transactionId: widget.transactionId!,
           type: _type, // 'INCOME' or 'EXPENSE'
           accountId: _accountId!,
@@ -764,7 +774,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         );
       } else {
         // Create new transaction
-        await _txService.createTransaction(
+        await transactionsState.createTransaction(
           type: _type, // 'INCOME' or 'EXPENSE'
           accountId: _accountId!,
           categoryId: _categoryId!,
@@ -775,11 +785,12 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       }
       
       if (mounted) {
-        // Clear cache for transactions to force refresh next time
-        ApiClient.clearCacheForEndpoint('/api/transactions');
+        // Refresh accounts state to update account balances
+        if (mounted) {
+          final accountsState = context.read<AccountsState>();
+          await accountsState.refresh();
+        }
         
-        // Notify all pages that transactions have changed
-        _refreshNotifier.refreshTransactions();
         Navigator.of(context).pop(true); // tell caller to refresh
       }
     } catch (e) {
@@ -833,20 +844,23 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     });
 
     try {
+      final transactionsState = context.read<TransactionsState>();
+      
       if (isTransfer && _tx?.transferGroupId != null) {
         // Delete the entire transfer (both transactions)
-        await _txService.deleteTransfer(_tx!.transferGroupId!);
+        await transactionsState.deleteTransfer(_tx!.transferGroupId!);
       } else {
         // Delete single transaction
-        await _txService.deleteTransaction(widget.transactionId!);
+        await transactionsState.deleteTransaction(widget.transactionId!);
       }
       
       if (mounted) {
-        // Clear cache for transactions to force refresh next time
-        ApiClient.clearCacheForEndpoint('/api/transactions');
+        // Refresh accounts state to update account balances
+        if (mounted) {
+          final accountsState = context.read<AccountsState>();
+          await accountsState.refresh();
+        }
         
-        // Notify all pages that transactions have changed
-        _refreshNotifier.refreshTransactions();
         Navigator.of(context).pop(true); // tell caller to refresh
       }
     } catch (e) {

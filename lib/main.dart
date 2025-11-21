@@ -9,8 +9,9 @@ import 'pages/account_form_page.dart';
 import 'widgets/bottom_navigation_bar.dart' as custom;
 import 'ui/slide_transition_builder.dart'; // adjust the path
 import 'providers/theme_provider.dart';
-import 'utils/refresh_notifier.dart';
 import 'services/api_client.dart';
+import 'state/accounts_state.dart';
+import 'state/transactions_state.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,8 +22,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AccountsState()),
+        ChangeNotifierProvider(create: (_) => TransactionsState()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
@@ -51,14 +56,12 @@ class RootPage extends StatefulWidget {
 class RootPageState extends State<RootPage> {
   int _currentIndex = 0; // Start with Accounts page
   bool _isEditMode = false; // Edit mode for accounts page
-  final RefreshNotifier _refreshNotifier = RefreshNotifier.instance;
   bool _isAuthenticated = false;
   bool _isCheckingAuth = true;
 
   @override
   void initState() {
     super.initState();
-    _refreshNotifier.addListener(_onRefreshNotifierChanged);
     _checkAuthenticationStatus();
   }
 
@@ -72,16 +75,7 @@ class RootPageState extends State<RootPage> {
 
   @override
   void dispose() {
-    _refreshNotifier.removeListener(_onRefreshNotifierChanged);
     super.dispose();
-  }
-
-  void _onRefreshNotifierChanged() {
-    if (mounted) {
-      setState(() {
-        // Force rebuild of all pages when refresh notifier changes
-      });
-    }
   }
 
   Future<void> _logout() async {
@@ -100,21 +94,11 @@ class RootPageState extends State<RootPage> {
   }
 
   Future<void> _openAddAccount() async {
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const AccountFormPage(),
       ),
     );
-    
-    // If account was added, refresh accounts page
-    if (result == true) {
-      // Trigger a refresh by changing the index
-      setState(() {
-        final temp = _currentIndex;
-        _currentIndex = -1;
-        _currentIndex = temp;
-      });
-    }
   }
 
   @override

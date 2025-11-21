@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/account_group_service.dart';
 import '../models/account_group.dart';
-import '../utils/refresh_notifier.dart';
+import '../state/accounts_state.dart';
 
 class AccountGroupManagementPage extends StatefulWidget {
   const AccountGroupManagementPage({super.key});
@@ -111,8 +112,11 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
           kind: kindController.text.trim(),
         );
         _refreshAccountGroups();
-        // Trigger global refresh for accounts page
-        RefreshNotifier.instance.refreshAccounts();
+        // Refresh accounts state to update accounts page
+        if (mounted) {
+          final accountsState = context.read<AccountsState>();
+          await accountsState.refresh();
+        }
       } catch (e) {
         // Handle error silently
       }
@@ -194,8 +198,11 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
           kind: kindController.text.trim(),
         );
         _refreshAccountGroups();
-        // Trigger global refresh for accounts page
-        RefreshNotifier.instance.refreshAccounts();
+        // Refresh accounts state to update accounts page
+        if (mounted) {
+          final accountsState = context.read<AccountsState>();
+          await accountsState.refresh();
+        }
       } catch (e) {
         // Handle error silently
       }

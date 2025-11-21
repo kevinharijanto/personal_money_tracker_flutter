@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/transaction.dart';
-import '../services/transaction_service.dart';
 import '../pages/transaction_detail_page.dart';
 import '../utils/money_formatter.dart';
-import '../utils/refresh_notifier.dart';
+import '../state/accounts_state.dart';
+import '../state/transactions_state.dart';
 
 class AccountTransactionsPage extends StatefulWidget {
   final String accountId;
@@ -27,10 +28,6 @@ class AccountTransactionsPage extends StatefulWidget {
 }
 
 class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
-  final TransactionService _service = TransactionService();
-  late Future<List<TransactionModel>> _future;
-  final RefreshNotifier _refreshNotifier = RefreshNotifier.instance;
-
   bool _hasChanged = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -39,7 +36,6 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   @override
   void initState() {
     super.initState();
-    _refreshNotifier.addListener(_onRefreshNotifierChanged);
     _initializeAndFetchTransactions();
   }
 
@@ -55,60 +51,31 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
       _dateTo = DateTime(localNow.year, localNow.month + 1, 0);
     }
     
-    if (widget.accountId.isEmpty) {
-      // Fetch all transactions when accountId is empty
-      _future = _service.fetchTransactionsForAccountWithDateRange(
-        '', // Empty string to get all accounts
-        dateFrom: _dateFrom,
-        dateTo: _dateTo,
-        useCache: false, // Don't use cache when initializing to ensure fresh data
-      );
-    } else {
-      // Fetch transactions for specific account
-      _future = _service.fetchTransactionsForAccountWithDateRange(
-        widget.accountId,
-        dateFrom: _dateFrom,
-        dateTo: _dateTo,
-        useCache: false, // Don't use cache when initializing to ensure fresh data
-      );
-    }
+    // Load transactions using TransactionsState
+    final transactionsState = context.read<TransactionsState>();
+    transactionsState.loadForAccountWithDateRange(
+      accountId: widget.accountId,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      force: false, // Don't force when initializing
+    );
   }
 
   @override
   void dispose() {
-    _refreshNotifier.removeListener(_onRefreshNotifierChanged);
     super.dispose();
   }
 
-  void _onRefreshNotifierChanged() {
-    if (mounted) {
-      _refresh();
-    }
-  }
-
   Future<void> _refresh() async {
-    setState(() {
-      if (widget.accountId.isEmpty) {
-        // Fetch all transactions when accountId is empty
-        _future = _service.fetchTransactionsForAccountWithDateRange(
-          '', // Empty string to get all accounts
-          dateFrom: _dateFrom,
-          dateTo: _dateTo,
-          useCache: false, // Don't use cache when refreshing to ensure fresh data
-        );
-      } else {
-        // Fetch transactions for specific account
-        _future = _service.fetchTransactionsForAccountWithDateRange(
-          widget.accountId,
-          dateFrom: _dateFrom,
-          dateTo: _dateTo,
-          useCache: false, // Don't use cache when refreshing to ensure fresh data
-        );
-      }
-    });
+    final transactionsState = context.read<TransactionsState>();
+    await transactionsState.refreshForAccountWithDateRange(
+      accountId: widget.accountId,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+    );
   }
 
-  void _navigateDateRange({bool forward = true}) {
+  Future<void> _navigateDateRange({bool forward = true}) async {
     if (_dateFrom == null || _dateTo == null) return;
     
     DateTime newDateFrom;
@@ -143,27 +110,17 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
     setState(() {
       _dateFrom = newDateFrom;
       _dateTo = newDateTo;
-      if (widget.accountId.isEmpty) {
-        // Fetch all transactions when accountId is empty
-        _future = _service.fetchTransactionsForAccountWithDateRange(
-          '', // Empty string to get all accounts
-          dateFrom: _dateFrom,
-          dateTo: _dateTo,
-          useCache: false, // Don't use cache when navigating dates to ensure fresh data
-        );
-      } else {
-        // Fetch transactions for specific account
-        _future = _service.fetchTransactionsForAccountWithDateRange(
-          widget.accountId,
-          dateFrom: _dateFrom,
-          dateTo: _dateTo,
-          useCache: false, // Don't use cache when navigating dates to ensure fresh data
-        );
-      }
     });
+    
+    final transactionsState = context.read<TransactionsState>();
+    await transactionsState.refreshForAccountWithDateRange(
+      accountId: widget.accountId,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+    );
   }
 
-  void _switchViewMode(String mode) {
+  Future<void> _switchViewMode(String mode) async {
     if (_viewMode == mode) return;
     
     setState(() {
@@ -178,25 +135,14 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
         _dateFrom = DateTime(localNow.year, localNow.month, 1);
         _dateTo = DateTime(localNow.year, localNow.month + 1, 0);
       }
-      
-      if (widget.accountId.isEmpty) {
-        // Fetch all transactions when accountId is empty
-        _future = _service.fetchTransactionsForAccountWithDateRange(
-          '', // Empty string to get all accounts
-          dateFrom: _dateFrom,
-          dateTo: _dateTo,
-          useCache: false, // Don't use cache when switching view mode to ensure fresh data
-        );
-      } else {
-        // Fetch transactions for specific account
-        _future = _service.fetchTransactionsForAccountWithDateRange(
-          widget.accountId,
-          dateFrom: _dateFrom,
-          dateTo: _dateTo,
-          useCache: false, // Don't use cache when switching view mode to ensure fresh data
-        );
-      }
     });
+    
+    final transactionsState = context.read<TransactionsState>();
+    await transactionsState.refreshForAccountWithDateRange(
+      accountId: widget.accountId,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+    );
   }
 
   String _formatDateRange() {
@@ -238,8 +184,11 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
     if (created == true) {
       _hasChanged = true; // mark that something changed
       await _refresh();   // refresh this page list
-      // Notify other pages that transactions have changed
-      _refreshNotifier.refreshTransactions();
+      // Refresh accounts state to update account balances
+      if (mounted) {
+        final accountsState = context.read<AccountsState>();
+        await accountsState.refresh();
+      }
     }
   }
 
@@ -280,20 +229,19 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
           onPressed: _onFabPressed,
           child: const Icon(Icons.add),
         ),
-        body: FutureBuilder<List<TransactionModel>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
+        body: Consumer<TransactionsState>(
+          builder: (context, transactionsState, child) {
+            if (transactionsState.isLoading && !transactionsState.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (snapshot.hasError) {
+            if (transactionsState.error != null && !transactionsState.hasData) {
               return Center(
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Error: ${snapshot.error}'),
+                      Text('Error: ${transactionsState.error}'),
                       const SizedBox(height: 8),
                       ElevatedButton(
                         onPressed: _refresh,
@@ -305,7 +253,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
               );
             }
 
-            final txs = snapshot.data ?? [];
+            final txs = transactionsState.transactions;
             
             // Sort transactions by creation time (newest first)
             txs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -616,8 +564,11 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
         if (changed == true) {
           _hasChanged = true; // mark changed
           _refresh();
-          // Notify other pages that transactions have changed
-          _refreshNotifier.refreshTransactions();
+          // Refresh accounts state to update account balances
+          if (mounted) {
+            final accountsState = context.read<AccountsState>();
+            await accountsState.refresh();
+          }
         }
       },
     );

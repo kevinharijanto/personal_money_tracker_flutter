@@ -7,7 +7,7 @@ import 'category_management_page.dart';
 import 'account_group_management_page.dart';
 import 'accounts_page.dart';
 import 'login_page.dart';
-import '../utils/refresh_notifier.dart';
+import '../state/accounts_state.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -303,8 +303,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       );
                       // After returning from account group management, refresh accounts page
                       if (mounted) {
-                        // Trigger the global refresh notifier to update the accounts page
-                        RefreshNotifier.instance.refreshAccounts();
+                        // Use AccountsState to refresh accounts
+                        final accountsState = context.read<AccountsState>();
+                        await accountsState.refresh();
                       }
                     },
                   ),

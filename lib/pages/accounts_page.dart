@@ -1,11 +1,12 @@
-// lib/pages/accounts_page.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../storage/auth_storage.dart';
 import 'login_page.dart';
 import '../widgets/accounts_view.dart';
 import 'transaction_detail_page.dart';
 import 'account_form_page.dart';
-import '../utils/refresh_notifier.dart';
+import '../state/accounts_state.dart';
 
 class AccountsPage extends StatefulWidget {
   final bool isEditMode;
@@ -22,33 +23,19 @@ class AccountsPage extends StatefulWidget {
 }
 
 class _AccountsPageState extends State<AccountsPage> {
-  int _refreshToken = 0;
-  final RefreshNotifier _refreshNotifier = RefreshNotifier.instance;
-
   @override
   void initState() {
     super.initState();
-    _refreshNotifier.addListener(_onRefreshNotifierChanged);
+    // Trigger initial accounts load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final accountsState = context.read<AccountsState>();
+      accountsState.load(); // initial load (cached or fresh)
+    });
   }
 
   @override
   void dispose() {
-    _refreshNotifier.removeListener(_onRefreshNotifierChanged);
     super.dispose();
-  }
-
-  void _onRefreshNotifierChanged() {
-    if (mounted) {
-      _handleAccountsDataChanged();
-    }
-  }
-
-  /// Called when *any* child page (AccountsView / AccountTransactionsPage)
-  /// reports that data has changed (e.g. a transaction was added/edited).
-  void _handleAccountsDataChanged() {
-    setState(() {
-      _refreshToken++; // triggers AccountsView to refetch account groups
-    });
   }
 
   /// FAB → open add-transaction page from the main Accounts screen
@@ -63,9 +50,11 @@ class _AccountsPageState extends State<AccountsPage> {
 
     // If the detail page popped with `Navigator.pop(true)` → refresh accounts
     if (changed == true) {
-      _handleAccountsDataChanged();
-      // Notify other pages that transactions have changed
-      _refreshNotifier.refreshTransactions();
+      // when transactions slice is refactored, we'll hook into it.
+      // For now, AccountsState.refresh is NOT strictly necessary here.
+      if (!mounted) return;
+      final accountsState = context.read<AccountsState>();
+      await accountsState.refresh();
     }
   }
 
@@ -77,11 +66,9 @@ class _AccountsPageState extends State<AccountsPage> {
       ),
     );
 
-    // If the form page popped with `Navigator.pop(true)` → refresh accounts
-    if (changed == true) {
-      _handleAccountsDataChanged();
-      // Notify other pages that accounts have changed
-      _refreshNotifier.refreshAccounts();
+    if (changed == true && mounted) {
+      final accountsState = context.read<AccountsState>();
+      await accountsState.refresh();
     }
   }
 
@@ -90,8 +77,6 @@ class _AccountsPageState extends State<AccountsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: AccountsView(
-        refreshToken: _refreshToken,
-        onDataChanged: _handleAccountsDataChanged, // 🔥 important
         isEditMode: widget.isEditMode,
       ),
       floatingActionButton: FloatingActionButton(

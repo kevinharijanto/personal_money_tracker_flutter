@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../models/account_group.dart';
-import '../services/account_service.dart';
 import '../services/account_group_service.dart';
-import '../storage/auth_storage.dart';
-import '../utils/refresh_notifier.dart';
+import '../state/accounts_state.dart';
 
 class AccountFormPage extends StatefulWidget {
   final AccountModel? account; // null for creating new account
@@ -23,9 +23,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
   final _formKey = GlobalKey<FormState>(debugLabel: 'account_form_key');
   final _nameController = TextEditingController();
   final _balanceController = TextEditingController();
-  final AccountService _accountService = AccountService();
   final AccountGroupService _accountGroupService = AccountGroupService();
-  final RefreshNotifier _refreshNotifier = RefreshNotifier.instance;
   
   String? _selectedGroupId;
   String _selectedCurrency = 'IDR';
@@ -89,30 +87,22 @@ class _AccountFormPageState extends State<AccountFormPage> {
       _isLoading = true;
     });
 
-    try {
-      final userId = await AuthStorage.getUserId();
-      if (userId == null) {
-        // Try to get user info from token or use a default
-        // For now, we'll use a placeholder
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID not found, please log in again')),
-        );
-        return;
-      }
+    final accountsState = context.read<AccountsState>();
+    final isEditing = widget.account != null;
 
-      if (widget.account == null) {
+    try {
+      if (!isEditing) {
         // Create new account
-        await _accountService.createAccount(
+        await accountsState.createAccount(
           name: _nameController.text,
           groupId: _selectedGroupId!,
           currency: _selectedCurrency,
           startingBalance: _balanceController.text,
           isArchived: _isArchived,
-          ownerUserId: userId,
         );
       } else {
         // Update existing account
-        await _accountService.updateAccount(
+        await accountsState.updateAccount(
           accountId: widget.account!.id,
           name: _nameController.text,
           currency: _selectedCurrency,
@@ -121,9 +111,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
       }
 
       if (mounted) {
-        // Notify all pages that accounts have changed
-        _refreshNotifier.refreshAccounts();
-        Navigator.of(context).pop(true); // Return true to indicate success
+        Navigator.of(context).pop(true); // signal success to caller
       }
     } catch (e) {
       if (mounted) {
@@ -187,11 +175,10 @@ class _AccountFormPageState extends State<AccountFormPage> {
                   });
 
                   try {
-                    await _accountService.deleteAccount(widget.account!.id);
+                    final accountsState = context.read<AccountsState>();
+                    await accountsState.deleteAccount(widget.account!.id);
                     if (mounted) {
-                      // Notify all pages that accounts have changed
-                      _refreshNotifier.refreshAccounts();
-                      Navigator.of(context).pop(true); // Return true to indicate success
+                      Navigator.of(context).pop(true);
                     }
                   } catch (e) {
                     if (mounted) {
