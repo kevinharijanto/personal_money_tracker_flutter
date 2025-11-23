@@ -39,24 +39,24 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   /// FAB → open add-transaction page from the main Accounts screen
-  Future<void> _openNewTransaction() async {
-    final changed = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const TransactionDetailPage(
-          initialType: 'EXPENSE', // default tab when creating
-        ),
-      ),
-    );
+  // Future<void> _openNewTransaction() async {
+  //   final changed = await Navigator.of(context).push(
+  //     MaterialPageRoute(
+  //       builder: (_) => const TransactionDetailPage(
+  //         initialType: 'EXPENSE', // default tab when creating
+  //       ),
+  //     ),
+  //   );
 
-    // If the detail page popped with `Navigator.pop(true)` → refresh accounts
-    if (changed == true) {
-      // when transactions slice is refactored, we'll hook into it.
-      // For now, AccountsState.refresh is NOT strictly necessary here.
-      if (!mounted) return;
-      final accountsState = context.read<AccountsState>();
-      await accountsState.refresh();
-    }
-  }
+  //   // If the detail page popped with `Navigator.pop(true)` → refresh accounts
+  //   if (changed == true) {
+  //     // when transactions slice is refactored, we'll hook into it.
+  //     // For now, AccountsState.refresh is NOT strictly necessary here.
+  //     if (!mounted) return;
+  //     final accountsState = context.read<AccountsState>();
+  //     await accountsState.refresh();
+  //   }
+  // }
 
   /// Open add account page
   Future<void> _openAddAccount() async {
@@ -67,8 +67,11 @@ class _AccountsPageState extends State<AccountsPage> {
     );
 
     if (changed == true && mounted) {
-      final accountsState = context.read<AccountsState>();
-      await accountsState.refresh();
+      // Use addPostFrameCallback to ensure state changes happen after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final accountsState = context.read<AccountsState>();
+        accountsState.refresh();
+      });
     }
   }
 
@@ -79,10 +82,10 @@ class _AccountsPageState extends State<AccountsPage> {
       body: AccountsView(
         isEditMode: widget.isEditMode,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openNewTransaction,
-        child: const Icon(Icons.add),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: _openNewTransaction,
+      //   child: const Icon(Icons.add),
+      // ),
     );
   }
 }

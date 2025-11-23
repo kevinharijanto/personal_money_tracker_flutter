@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/category_service.dart';
+import '../widgets/app_loading.dart';
+import '../widgets/app_error.dart';
 
 class CategoryManagementPage extends StatefulWidget {
   final String categoryType; // 'INCOME' or 'EXPENSE'
@@ -40,12 +42,10 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text('Add ${widget.categoryType == 'INCOME' ? 'Income' : 'Expense'} Category'),
+          title: Text('Add ${widget.categoryType == 'INCOME' ? 'Income' : 'Expense'} Category', style: Theme.of(context).textTheme.headlineLarge),
           backgroundColor: Theme.of(context).colorScheme.surface,
-          titleTextStyle: TextStyle(
+          titleTextStyle: Theme.of(context).textTheme.headlineLarge?.copyWith(
             color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
           ),
           content: Form(
             key: formKey,
@@ -73,7 +73,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             ElevatedButton(
               onPressed: () {
@@ -81,7 +81,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Add'),
+              child: Text('Add', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -112,12 +112,10 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text('Edit ${widget.categoryType == 'INCOME' ? 'Income' : 'Expense'} Category'),
+          title: Text('Edit ${widget.categoryType == 'INCOME' ? 'Income' : 'Expense'} Category', style: Theme.of(context).textTheme.headlineLarge),
           backgroundColor: Theme.of(context).colorScheme.surface,
-          titleTextStyle: TextStyle(
+          titleTextStyle: Theme.of(context).textTheme.headlineLarge?.copyWith(
             color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
           ),
           content: Form(
             key: formKey,
@@ -145,7 +143,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             ElevatedButton(
               onPressed: () {
@@ -153,7 +151,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Save'),
+              child: Text('Save', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -182,23 +180,21 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Delete Category'),
+          title: Text('Delete Category', style: Theme.of(context).textTheme.headlineLarge),
           backgroundColor: Theme.of(context).colorScheme.surface,
-          titleTextStyle: TextStyle(
+          titleTextStyle: Theme.of(context).textTheme.headlineLarge?.copyWith(
             color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
           ),
           content: Text(
             'Are you sure you want to delete "${category.name}"? This action cannot be undone.',
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
@@ -206,7 +202,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Delete'),
+              child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -230,28 +226,19 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(widget.title, style: Theme.of(context).textTheme.headlineLarge),
       ),
       body: FutureBuilder<List<CategoryModel>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoading();
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Error: ${snapshot.error}'),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _refreshCategories,
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+            return AppError(
+              message: 'Error: ${snapshot.error}',
+              onRetry: _refreshCategories,
             );
           }
 
@@ -264,12 +251,12 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                 children: [
                   Text(
                     'No ${widget.categoryType == 'INCOME' ? 'income' : 'expense'} categories yet.',
-                    style: const TextStyle(fontSize: 16),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _showAddCategoryDialog,
-                    child: const Text('Add Category'),
+                    child: Text('Add Category', style: Theme.of(context).textTheme.bodyMedium),
                   ),
                 ],
               ),
@@ -288,7 +275,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                   child: ListTile(
                     title: Text(
                       category.name,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,

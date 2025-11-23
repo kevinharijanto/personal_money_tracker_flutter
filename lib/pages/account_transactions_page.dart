@@ -5,6 +5,8 @@ import '../pages/transaction_detail_page.dart';
 import '../utils/money_formatter.dart';
 import '../state/accounts_state.dart';
 import '../state/transactions_state.dart';
+import '../widgets/app_loading.dart';
+import '../widgets/app_error.dart';
 
 class AccountTransactionsPage extends StatefulWidget {
   final String accountId;
@@ -36,10 +38,6 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   @override
   void initState() {
     super.initState();
-    _initializeAndFetchTransactions();
-  }
-
-  void _initializeAndFetchTransactions() {
     // Initialize with current day for daily view
     final now = DateTime.now();
     final localNow = now.toLocal(); // Convert to local time
@@ -51,6 +49,13 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
       _dateTo = DateTime(localNow.year, localNow.month + 1, 0);
     }
     
+    // Use addPostFrameCallback to ensure state changes happen after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAndFetchTransactions();
+    });
+  }
+
+  void _initializeAndFetchTransactions() {
     // Load transactions using TransactionsState
     final transactionsState = context.read<TransactionsState>();
     transactionsState.loadForAccountWithDateRange(
@@ -112,12 +117,15 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
       _dateTo = newDateTo;
     });
     
-    final transactionsState = context.read<TransactionsState>();
-    await transactionsState.refreshForAccountWithDateRange(
-      accountId: widget.accountId,
-      dateFrom: _dateFrom,
-      dateTo: _dateTo,
-    );
+    // Use addPostFrameCallback to ensure state changes happen after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final transactionsState = context.read<TransactionsState>();
+      transactionsState.refreshForAccountWithDateRange(
+        accountId: widget.accountId,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      );
+    });
   }
 
   Future<void> _switchViewMode(String mode) async {
@@ -137,11 +145,181 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
       }
     });
     
-    final transactionsState = context.read<TransactionsState>();
-    await transactionsState.refreshForAccountWithDateRange(
-      accountId: widget.accountId,
-      dateFrom: _dateFrom,
-      dateTo: _dateTo,
+    // Use addPostFrameCallback to ensure state changes happen after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final transactionsState = context.read<TransactionsState>();
+      transactionsState.refreshForAccountWithDateRange(
+        accountId: widget.accountId,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      );
+    });
+  }
+
+  Future<void> _openDatePicker() async {
+    DateTime? picked;
+    
+    if (_viewMode == 'daily') {
+      // Use standard date picker for daily view
+      picked = await showDatePicker(
+        context: context,
+        initialDate: _dateFrom ?? DateTime.now(),
+        firstDate: DateTime(2000),
+        lastDate: DateTime.now(),
+      );
+    } else {
+      // Use custom month picker for monthly view
+      picked = await _showMonthPicker(
+        context: context,
+        initialDate: _dateFrom ?? DateTime.now(),
+      );
+    }
+
+    if (picked != null) {
+      setState(() {
+        if (_viewMode == 'daily') {
+          // For daily view, set the date range to the selected day
+          _dateFrom = DateTime(picked!.year, picked!.month, picked!.day);
+          _dateTo = DateTime(picked!.year, picked!.month, picked!.day + 1);
+        } else {
+          // For monthly view, set the date range to the selected month
+          _dateFrom = DateTime(picked!.year, picked!.month, 1);
+          _dateTo = DateTime(picked!.year, picked!.month + 1, 0);
+        }
+      });
+      
+      // Use addPostFrameCallback to ensure state changes happen after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final transactionsState = context.read<TransactionsState>();
+        transactionsState.refreshForAccountWithDateRange(
+          accountId: widget.accountId,
+          dateFrom: _dateFrom,
+          dateTo: _dateTo,
+        );
+      });
+    }
+  }
+
+
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
+  }
+
+  Future<DateTime?> _showMonthPicker({
+    required BuildContext context,
+    required DateTime initialDate,
+  }) async {
+    int selectedYear = initialDate.year;
+    int selectedMonth = initialDate.month;
+
+    return showDialog<DateTime>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select Month', style: Theme.of(context).textTheme.titleMedium),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SizedBox(
+                width: 300,
+                height: 400,
+                child: Column(
+                  children: [
+                    // Year selector
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_left),
+                          onPressed: () {
+                            setState(() {
+                              selectedYear--;
+                            });
+                          },
+                        ),
+                        Text(
+                          '$selectedYear',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_right),
+                          onPressed: () {
+                            setState(() {
+                              selectedYear++;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Month grid
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 2.5,
+                        ),
+                        itemCount: 12,
+                        itemBuilder: (context, index) {
+                          final month = index + 1;
+                          final monthNames = [
+                            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                          ];
+                          final isSelected = month == selectedMonth;
+                          
+                          return GestureDetector(
+                            onTap: () {
+                              // Close dialog immediately when a month is selected
+                              Navigator.of(context).pop(DateTime(selectedYear, month, 1));
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.grey,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  monthNames[index],
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.onPrimary
+                                        : Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -183,12 +361,16 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
 
     if (created == true) {
       _hasChanged = true; // mark that something changed
-      await _refresh();   // refresh this page list
-      // Refresh accounts state to update account balances
-      if (mounted) {
-        final accountsState = context.read<AccountsState>();
-        await accountsState.refresh();
-      }
+      
+      // Use addPostFrameCallback to ensure state changes happen after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refresh();   // refresh this page list
+        // Refresh accounts state to update account balances
+        if (mounted) {
+          final accountsState = context.read<AccountsState>();
+          accountsState.refresh();
+        }
+      });
     }
   }
 
@@ -232,24 +414,13 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
         body: Consumer<TransactionsState>(
           builder: (context, transactionsState, child) {
             if (transactionsState.isLoading && !transactionsState.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const AppLoading();
             }
 
             if (transactionsState.error != null && !transactionsState.hasData) {
-              return Center(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Error: ${transactionsState.error}'),
-                      const SizedBox(height: 8),
-                      ElevatedButton(
-                        onPressed: _refresh,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                ),
+              return AppError(
+                message: 'Error: ${transactionsState.error}',
+                onRetry: _refresh,
               );
             }
 
@@ -267,7 +438,12 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
                     _buildDateRangeRow(),
                     const SizedBox(height: 12),
                     const SizedBox(height: 80),
-                    const Center(child: Text('No transactions for this period.')),
+                    Center(
+                      child: Text(
+                        'No transactions for this period.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -358,7 +534,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
                     child: Text(
                       'Daily',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: _viewMode == 'daily' ? FontWeight.w600 : FontWeight.w400,
                         color: _viewMode == 'daily'
                             ? theme.colorScheme.primary
@@ -382,7 +558,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
                     child: Text(
                       'Monthly',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: _viewMode == 'monthly' ? FontWeight.w600 : FontWeight.w400,
                         color: _viewMode == 'monthly'
                             ? theme.colorScheme.primary
@@ -405,21 +581,24 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
               tooltip: _viewMode == 'daily' ? 'Previous day' : 'Previous month',
               onPressed: () => _navigateDateRange(forward: false),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: theme.colorScheme.primary,
-                  width: 1,
+            GestureDetector(
+              onTap: _openDatePicker,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: theme.colorScheme.primary,
+                    width: 1,
+                  ),
                 ),
-              ),
-              child: Text(
-                _formatDateRange(),
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.primary,
+                child: Text(
+                  _formatDateRange(),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
               ),
             ),
@@ -452,6 +631,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   }
 
   Widget _summaryItem(String label, String value, {Color? color}) {
+    final theme = Theme.of(context);
     // Determine font size based on value length
     double fontSize = 13;
     if (value.length > 10) {
@@ -465,15 +645,15 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
+          style: theme.textTheme.bodySmall?.copyWith(
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
-            color: color ?? Theme.of(context).colorScheme.onSurface,
+            color: color ?? theme.colorScheme.onSurface,
           ),
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
@@ -484,6 +664,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
 
   Widget _buildDateSection(
       String dateKey, double dateTotal, List<TransactionModel> txs) {
+    final theme = Theme.of(context);
     final dtParts = dateKey.split('-');
     final yyyy = dtParts[0];
     final mm = dtParts[1];
@@ -498,15 +679,15 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
           children: [
             Text(
               '$dd/$mm/$yyyy',
-              style:
-                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
             Text(
               MoneyFormatter.formatIDR(dateTotal),
-              style: TextStyle(
+              style: theme.textTheme.titleSmall?.copyWith(
                 color: dateTotal >= 0 ? Colors.blue : Colors.red,
                 fontWeight: FontWeight.w500,
-                fontSize: 13,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
@@ -520,6 +701,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   }
 
   Widget _buildTransactionTile(TransactionModel t) {
+    final theme = Theme.of(context);
     final isExpense = t.type == 'EXPENSE';
     final amountText = MoneyFormatter.formatIDR(t.amount);
 
@@ -530,19 +712,18 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.circle, size: 10),
-      title: Text(title),
+      title: Text(title, style: theme.textTheme.bodyMedium),
       subtitle: Text(
         widget.accountId.isEmpty
             ? '${t.accountName} • ${t.categoryName}'
             : t.categoryName,
-        style: const TextStyle(fontSize: 12, color: Colors.grey),
+        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
       ),
       trailing: Text(
         amountText,
-        style: TextStyle(
+        style: theme.textTheme.titleSmall?.copyWith(
           color: isExpense ? Colors.red : Colors.blue,
           fontWeight: FontWeight.w600,
-          fontSize: 13,
         ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
@@ -563,12 +744,16 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
 
         if (changed == true) {
           _hasChanged = true; // mark changed
-          _refresh();
-          // Refresh accounts state to update account balances
-          if (mounted) {
-            final accountsState = context.read<AccountsState>();
-            await accountsState.refresh();
-          }
+          
+          // Use addPostFrameCallback to ensure state changes happen after build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _refresh();
+            // Refresh accounts state to update account balances
+            if (mounted) {
+              final accountsState = context.read<AccountsState>();
+              accountsState.refresh();
+            }
+          });
         }
       },
     );

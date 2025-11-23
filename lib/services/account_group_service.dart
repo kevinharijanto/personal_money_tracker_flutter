@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import '../models/account_group.dart';
 
@@ -8,9 +9,26 @@ class AccountGroupService {
     final res = await ApiClient.get('/api/account-groups', useCache: useCache);
 
     final List<dynamic> data = jsonDecode(res.body) as List<dynamic>;
-    return data
+    
+    // Debug print to see the raw API response
+    debugPrint('=== Account Groups API Response ===');
+    debugPrint('Response body: ${res.body}');
+    debugPrint('Number of groups: ${data.length}');
+    
+    final groups = data
         .map((e) => AccountGroup.fromJson(e as Map<String, dynamic>))
         .toList();
+    
+    // Debug print the parsed groups
+    for (final group in groups) {
+      debugPrint('Group: ${group.name}, Kind: "${group.kind}", Accounts: ${group.accounts.length}');
+      for (final account in group.accounts) {
+        debugPrint('  Account: ${account.name}, Balance: ${account.balance}');
+      }
+    }
+    debugPrint('=== End API Response Debug ===');
+    
+    return groups;
   }
 
   /// POST /api/account-groups

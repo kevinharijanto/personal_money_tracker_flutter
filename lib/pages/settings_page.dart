@@ -137,15 +137,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'Welcome, $name',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   if (email.isNotEmpty)
                     Text(
                       email,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                     ),
                 ],
               ),
@@ -160,16 +157,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'Timezone',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Select your timezone to ensure dates and times are displayed correctly.',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
@@ -200,8 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   const SizedBox(height: 8),
                   Text(
                     'Current: ${_timezones.firstWhere((tz) => tz['value'] == _currentTimezone)['label'] ?? 'Unknown'}',
-                    style: const TextStyle(
-                      fontSize: 12,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontStyle: FontStyle.italic,
                       color: Colors.grey,
                     ),
@@ -219,23 +211,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'Category Management',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Manage your income and expense categories.',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: 16),
                   ListTile(
                     leading: const Icon(Icons.trending_up, color: Colors.green),
-                    title: const Text('Income Category Setting'),
+                    title: Text('Income Category Setting', style: Theme.of(context).textTheme.bodyMedium),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       Navigator.of(context).push(
@@ -251,7 +239,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   const Divider(),
                   ListTile(
                     leading: const Icon(Icons.trending_down, color: Colors.red),
-                    title: const Text('Expenses Category Setting'),
+                    title: Text('Expenses Category Setting', style: Theme.of(context).textTheme.bodyMedium),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
                       Navigator.of(context).push(
@@ -277,23 +265,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'Account Group Management',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Manage your account groups (Bank Accounts, Cash, Credit Cards, etc.).',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: 16),
                   ListTile(
                     leading: const Icon(Icons.account_balance, color: Colors.blue),
-                    title: const Text('Account Groups'),
+                    title: Text('Account Groups', style: Theme.of(context).textTheme.bodyMedium),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () async {
                       final result = await Navigator.of(context).push(
@@ -322,22 +306,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'Appearance',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Toggle dark mode for better viewing experience.',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile(
-                    title: const Text('Dark Mode'),
+                    title: Text('Dark Mode', style: Theme.of(context).textTheme.bodyMedium),
                     subtitle: Text(themeProvider.isDarkMode ? 'Currently enabled' : 'Currently disabled'),
                     value: themeProvider.isDarkMode,
                     onChanged: (value) {
@@ -358,24 +338,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'About',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Personal Money Tracker v1.0.0',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'A simple app to track your income, expenses, and account balances.',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),

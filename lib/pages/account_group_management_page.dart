@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../services/account_group_service.dart';
 import '../models/account_group.dart';
 import '../state/accounts_state.dart';
+import '../widgets/app_loading.dart';
+import '../widgets/app_error.dart';
 
 class AccountGroupManagementPage extends StatefulWidget {
   const AccountGroupManagementPage({super.key});
@@ -47,7 +49,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Add Account Group'),
+          title: Text('Add Account Group', style: Theme.of(context).textTheme.headlineLarge),
           content: Form(
             key: formKey,
             child: Column(
@@ -90,7 +92,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             ElevatedButton(
               onPressed: () {
@@ -98,7 +100,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Add'),
+              child: Text('Add', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -132,7 +134,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Edit Account Group'),
+          title: Text('Edit Account Group', style: Theme.of(context).textTheme.headlineLarge),
           content: Form(
             key: formKey,
             child: Column(
@@ -175,7 +177,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             ElevatedButton(
               onPressed: () {
@@ -183,7 +185,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Save'),
+              child: Text('Save', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -214,14 +216,15 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Delete Account Group'),
+          title: Text('Delete Account Group', style: Theme.of(context).textTheme.headlineLarge),
           content: Text(
             'Are you sure you want to delete "${accountGroup.name}"? This action cannot be undone.',
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
@@ -229,7 +232,7 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Delete'),
+              child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -258,28 +261,19 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Account Groups'),
+        title: Text('Account Groups', style: Theme.of(context).textTheme.headlineLarge),
       ),
       body: FutureBuilder<List<AccountGroup>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoading();
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Error: ${snapshot.error}'),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _refreshAccountGroups,
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+            return AppError(
+              message: 'Error: ${snapshot.error}',
+              onRetry: _refreshAccountGroups,
             );
           }
 
@@ -290,14 +284,14 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'No account groups yet.',
-                    style: TextStyle(fontSize: 16),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _showAddAccountGroupDialog,
-                    child: const Text('Add Account Group'),
+                    child: Text('Add Account Group', style: Theme.of(context).textTheme.bodyMedium),
                   ),
                 ],
               ),
@@ -316,12 +310,11 @@ class _AccountGroupManagementPageState extends State<AccountGroupManagementPage>
                   child: ListTile(
                     title: Text(
                       accountGroup.name,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                     ),
                     subtitle: Text(
                       _getKindLabel(accountGroup.kind),
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey[600],
                       ),
                     ),

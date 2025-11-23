@@ -30,6 +30,24 @@ class ThemeProvider extends ChangeNotifier {
       useMaterial3: true,
       colorSchemeSeed: const Color(0xFF5555FF),
       brightness: _isDarkMode ? Brightness.dark : Brightness.light,
+      fontFamily: 'SF Pro',
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        displayMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        displaySmall: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        headlineLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+        titleMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        bodyLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+        bodySmall: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+        labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        labelMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        labelSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
       pageTransitionsTheme: PageTransitionsTheme(
         builders: {
           // apply to all platforms

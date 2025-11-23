@@ -1,156 +1,142 @@
+// inside widgets/transactions_table.dart (or a new file)
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../state/transactions_state.dart';
 import '../models/transaction.dart';
 import '../utils/money_formatter.dart';
-import '../state/transactions_state.dart';
 
-class TransactionsTable extends StatefulWidget {
+class TransactionsTable extends StatelessWidget {
   const TransactionsTable({super.key});
-
-  @override
-  State<TransactionsTable> createState() => _TransactionsTableState();
-}
-
-class _TransactionsTableState extends State<TransactionsTable> {
-  @override
-  void initState() {
-    super.initState();
-    // Load transactions using TransactionsState
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final transactionsState = context.read<TransactionsState>();
-      transactionsState.load(); // initial load (cached or fresh)
-    });
-  }
-
-  void _setFilter(String type) {
-    final transactionsState = context.read<TransactionsState>();
-    transactionsState.setFilter(type);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<TransactionsState>(
-      builder: (context, transactionsState, child) {
-        if (transactionsState.isLoading && !transactionsState.hasData) {
+      builder: (context, txState, child) {
+        if (txState.isLoading && !txState.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (transactionsState.error != null && !transactionsState.hasData) {
+        if (txState.error != null && !txState.hasData) {
           return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Error: ${transactionsState.error}'),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () => transactionsState.refresh(),
-                  child: const Text('Retry'),
-                ),
-              ],
+            child: Text(
+              'Error: ${txState.error}',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           );
         }
 
-        final filtered = transactionsState.filteredTransactions;
-
-        if (filtered.isEmpty) {
-          return Column(
-            children: [
-              _buildFilterRow(),
-              const SizedBox(height: 16),
-              const Expanded(
-                child: Center(child: Text('No transactions found.')),
-              ),
-            ],
+        final transactions = txState.filteredTransactions;
+        if (transactions.isEmpty) {
+          return Center(
+            child: Text(
+              'No transactions',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           );
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFilterRow(),
-            const SizedBox(height: 8),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => transactionsState.refresh(),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('Date')),
-                        DataColumn(label: Text('Type')),
-                        DataColumn(label: Text('Account')),
-                        DataColumn(label: Text('Category')),
-                        DataColumn(label: Text('Amount')),
-                      ],
-                      rows: filtered.map((tx) {
-                        final isExpense = tx.type == 'EXPENSE';
-                        final amountText = MoneyFormatter.formatIDR(tx.amount);
-
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(_formatDate(tx.date))),
-                            DataCell(Text(tx.type)),
-                            DataCell(Text(tx.accountName)),
-                            DataCell(Text(tx.categoryName)),
-                            DataCell(
-                              Text(
-                                amountText,
-                                style: TextStyle(
-                                  color: isExpense ? Colors.red : Colors.green,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        // Simple vertical list for now; we can group by date later
+        return RefreshIndicator(
+          onRefresh: () => txState.refresh(),
+          child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: transactions.length,
+            separatorBuilder: (_, __) => const Divider(height: 0),
+            itemBuilder: (context, index) {
+              final tx = transactions[index];
+              return _TransactionRow(tx: tx);
+            },
+          ),
         );
       },
     );
   }
+}
 
-  Widget _buildFilterRow() {
-    return Consumer<TransactionsState>(
-      builder: (context, transactionsState, child) {
-        return Wrap(
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text('All'),
-              selected: transactionsState.typeFilter == 'ALL',
-              onSelected: (_) => _setFilter('ALL'),
+class _TransactionRow extends StatelessWidget {
+  final TransactionModel tx;
+
+  const _TransactionRow({required this.tx});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isExpense = tx.type == 'EXPENSE';
+    final isIncome = tx.type == 'INCOME';
+    final isTransfer = tx.type == 'TRANSFER';
+
+    final amountText = MoneyFormatter.formatIDR(tx.amount);
+
+    Color amountColor;
+    if (isExpense) {
+      amountColor = Colors.redAccent;
+    } else if (isIncome) {
+      amountColor = Colors.blueAccent;
+    } else {
+      amountColor = theme.colorScheme.onSurface; // transfer
+    }
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: _buildCategoryIcon(theme),
+      title: Text(
+        tx.categoryName.isNotEmpty ? tx.categoryName : (isTransfer ? 'Transfer' : 'No category'),
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: theme.colorScheme.onSurface,
+        ),
+      ),
+      subtitle: Text(
+        tx.accountName,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurface.withOpacity(0.7),
+        ),
+      ),
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            amountText,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: amountColor,
             ),
-            ChoiceChip(
-              label: const Text('Income'),
-              selected: transactionsState.typeFilter == 'INCOME',
-              onSelected: (_) => _setFilter('INCOME'),
-            ),
-            ChoiceChip(
-              label: const Text('Expense'),
-              selected: transactionsState.typeFilter == 'EXPENSE',
-              onSelected: (_) => _setFilter('EXPENSE'),
-            ),
-          ],
-        );
+          ),
+          // if (tx.balanceAfter != null) // optional, if you ever add running balance
+          //   Text(
+          //     MoneyFormatter.formatIDR(tx.balanceAfter!),
+          //     style: TextStyle(
+          //       fontSize: 11,
+          //       color: theme.colorScheme.onSurface.withOpacity(0.6),
+          //     ),
+          //   ),
+        ],
+      ),
+      onTap: () {
+        // open TransactionDetailPage for editing if you want
       },
     );
   }
 
-  String _formatDate(DateTime dt) {
-    return '${dt.year}-${_two(dt.month)}-${_two(dt.day)}';
-  }
+  Widget _buildCategoryIcon(ThemeData theme) {
+    // Placeholder: later we can map category to emoji / icon.
+    final isTransfer = tx.type == 'TRANSFER';
+    final bgColor = isTransfer
+        ? theme.colorScheme.primary.withOpacity(0.15)
+        : theme.colorScheme.surfaceVariant;
 
-  String _two(int v) => v.toString().padLeft(2, '0');
+    final icon = isTransfer ? Icons.swap_horiz : Icons.category;
+
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: bgColor,
+      child: Icon(
+        icon,
+        size: 18,
+        color: theme.colorScheme.onSurface.withOpacity(0.8),
+      ),
+    );
+  }
 }

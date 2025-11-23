@@ -119,7 +119,7 @@ class RootPageState extends State<RootPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_getAppBarTitle()),
+        title: Text(_getAppBarTitle(), style: Theme.of(context).textTheme.headlineLarge),
         actions: _currentIndex == 1 ? [
           IconButton(
             onPressed: _toggleEditMode,
@@ -151,7 +151,7 @@ class RootPageState extends State<RootPage> {
         return AccountTransactionsPage(
           key: ValueKey('transactions_page_$_isAuthenticated'), // Change key when auth state changes
           accountId: '', // Empty string to indicate all accounts
-          accountName: 'All Accounts',
+          accountName: 'Select Account',
           currency: 'IDR',
           currentBalance: 0.0, // We don't have a total balance for all accounts
           showAppBar: false, // Hide AppBar since it's shown in the root page

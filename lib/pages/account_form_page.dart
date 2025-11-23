@@ -135,7 +135,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text(title, style: Theme.of(context).textTheme.headlineLarge),
         actions: [
           if (isEditing)
             IconButton(
@@ -144,26 +144,23 @@ class _AccountFormPageState extends State<AccountFormPage> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete Account'),
-                    content: const Text('Are you sure you want to delete this account?'),
+                    title: Text('Delete Account', style: Theme.of(context).textTheme.headlineLarge),
+                    content: Text('Are you sure you want to delete this account?', style: Theme.of(context).textTheme.titleLarge),
                     backgroundColor: Theme.of(context).colorScheme.surface,
-                    titleTextStyle: TextStyle(
+                    titleTextStyle: Theme.of(context).textTheme.headlineLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
                     ),
-                    contentTextStyle: TextStyle(
+                    contentTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 16,
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Cancel'),
+                        child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Delete'),
+                        child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
                       ),
                     ],
                   ),
@@ -231,7 +228,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
                         items: _accountGroups.map((group) {
                           return DropdownMenuItem(
                             value: group.id,
-                            child: Text(group.name),
+                            child: Text(group.name, style: Theme.of(context).textTheme.bodyMedium),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -272,11 +269,11 @@ class _AccountFormPageState extends State<AccountFormPage> {
                         labelText: 'Currency',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'IDR', child: Text('IDR')),
-                        DropdownMenuItem(value: 'USD', child: Text('USD')),
-                        DropdownMenuItem(value: 'EUR', child: Text('EUR')),
-                        DropdownMenuItem(value: 'SGD', child: Text('SGD')),
+                      items: [
+                        DropdownMenuItem(value: 'IDR', child: Text('IDR', style: Theme.of(context).textTheme.bodyMedium)),
+                        DropdownMenuItem(value: 'USD', child: Text('USD', style: Theme.of(context).textTheme.bodyMedium)),
+                        DropdownMenuItem(value: 'EUR', child: Text('EUR', style: Theme.of(context).textTheme.bodyMedium)),
+                        DropdownMenuItem(value: 'SGD', child: Text('SGD', style: Theme.of(context).textTheme.bodyMedium)),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -286,7 +283,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
                     ),
                     const SizedBox(height: 16),
                     CheckboxListTile(
-                      title: const Text('Archived'),
+                      title: Text('Archived', style: Theme.of(context).textTheme.bodyMedium),
                       value: _isArchived,
                       onChanged: (value) {
                         setState(() {
@@ -304,7 +301,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(isEditing ? 'Update' : 'Create'),
+                          : Text(isEditing ? 'Update' : 'Create', style: Theme.of(context).textTheme.bodyMedium),
                     ),
                   ],
                 ),

@@ -40,69 +40,6 @@ class TransactionDetailPage extends StatefulWidget {
   State<TransactionDetailPage> createState() => _TransactionDetailPageState();
 }
 
-class _AmountInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    // Allow empty input
-    if (newValue.text.isEmpty) {
-      return newValue;
-    }
-
-    // Remove all non-digit characters except decimal point and comma
-    String cleanText = newValue.text.replaceAll(RegExp(r'[^0-9.,]'), '');
-    
-    // Only allow one decimal separator (either . or ,)
-    final hasDot = cleanText.contains('.');
-    final hasComma = cleanText.contains(',');
-    if (hasDot && hasComma) {
-      // If both exist, use the last one as decimal separator
-      final lastDotIndex = cleanText.lastIndexOf('.');
-      final lastCommaIndex = cleanText.lastIndexOf(',');
-      if (lastDotIndex > lastCommaIndex) {
-        cleanText = cleanText.replaceAll(',', '');
-      } else {
-        cleanText = cleanText.replaceAll('.', '');
-      }
-    }
-    
-    // Only allow one decimal separator
-    if (hasDot) {
-      final parts = cleanText.split('.');
-      if (parts.length > 2) {
-        cleanText = '${parts[0]}.${parts.sublist(1).join('')}';
-      }
-    } else if (hasComma) {
-      final parts = cleanText.split(',');
-      if (parts.length > 2) {
-        cleanText = '${parts[0]},${parts.sublist(1).join('')}';
-      }
-    }
-    
-    // Limit decimal places to 2
-    if (hasDot) {
-      final parts = cleanText.split('.');
-      if (parts.length == 2 && parts[1].length > 2) {
-        cleanText = '${parts[0]}.${parts[1].substring(0, 2)}';
-      }
-    } else if (hasComma) {
-      final parts = cleanText.split(',');
-      if (parts.length == 2 && parts[1].length > 2) {
-        cleanText = '${parts[0]},${parts[1].substring(0, 2)}';
-      }
-    }
-    
-    // Don't format while user is typing to allow editing
-    // Just clean the input and return it
-    return TextEditingValue(
-      text: cleanText,
-      selection: TextSelection.collapsed(offset: cleanText.length),
-    );
-  }
-}
-
 class _TransactionDetailPageState extends State<TransactionDetailPage> {
   final CategoryService _categoryService = CategoryService();
   final AccountGroupService _accountService = AccountGroupService();
@@ -147,21 +84,35 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   void initState() {
     super.initState();
     _type = widget.initialType ?? 'EXPENSE';
-    
-    // Add listener to format amount when editing is complete
+
     _amountFocusNode.addListener(() {
-      // Format when the field loses focus
-      if (!_amountFocusNode.hasFocus && _amountCtrl.text.isNotEmpty) {
-        final value = MoneyFormatter.parse(_amountCtrl.text);
-        if (value > 0) {
-          _amountCtrl.text = MoneyFormatter.formatIDR(value);
-          _amountCtrl.selection = TextSelection.fromPosition(
-            TextPosition(offset: _amountCtrl.text.length),
-          );
+      // When gaining focus: show plain numeric value (easy to edit)
+      if (_amountFocusNode.hasFocus) {
+        if (_amountCtrl.text.isNotEmpty) {
+          final value = MoneyFormatter.parse(_amountCtrl.text);
+          if (value > 0) {
+            // remove thousand separators; just a plain fixed number
+            _amountCtrl.text = value.toStringAsFixed(2);
+            _amountCtrl.selection = TextSelection.fromPosition(
+              TextPosition(offset: _amountCtrl.text.length),
+            );
+          }
+        }
+      } else {
+        // When losing focus: pretty number with thousand separators (but no Rp)
+        if (_amountCtrl.text.isNotEmpty) {
+          final value = MoneyFormatter.parse(_amountCtrl.text);
+          if (value > 0) {
+            // THIS is the key change: use formatNumber, not formatIDR
+            _amountCtrl.text = MoneyFormatter.formatNumber(value); // e.g. 10,000.00
+            _amountCtrl.selection = TextSelection.fromPosition(
+              TextPosition(offset: _amountCtrl.text.length),
+            );
+          }
         }
       }
     });
-    
+
     _init();
   }
 
@@ -171,13 +122,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       await _loadExistingTransaction();
     } else {
       _accountId = widget.initialAccountId;
-      // _accountName = widget.initialAccountName;
-      _accountName = null;
+      _accountName = widget.initialAccountName;
       _categoryId = widget.initialCategoryId;
       _categoryName = widget.initialCategoryName;
 
-      // 👇 IMPORTANT: if we came from "All Accounts", accountId will be null.
-      // Don't show "All Accounts" as if it's a selected account.
       if (_accountId == null) {
         _accountName = null; // this will make the UI show "Select account"
       }
@@ -203,9 +151,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       _type = tx.type;
       // Convert UTC date to local date without time component to avoid timezone issues
       _date = DateTime(tx.date.year, tx.date.month, tx.date.day);
-      // Display amount as positive with Rp formatting
+      // Display amount as positive without Rp prefix (the prefix is shown in the UI)
       // Backend handles the sign based on transaction type
-      _amountCtrl.text = MoneyFormatter.formatIDR(tx.amount.abs());
+      _amountCtrl.text = MoneyFormatter.formatNumber(tx.amount.abs());
       _descCtrl.text = tx.description;
       _currency = tx.accountCurrency;
       _accountId = tx.accountId;
@@ -342,7 +290,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               onPressed: () => _setType(t),
               child: Text(
                 label(t),
-                style: TextStyle(
+                style: theme.textTheme.titleSmall?.copyWith(
                   color: selected ? baseColor : onSurface.withOpacity(0.7),
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),
@@ -379,9 +327,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                     children: [
                       Text(
                         'Date',
-                        style: TextStyle(
+                        style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
-                          fontSize: 14,
                           color: theme.colorScheme.onSurface,
                         ),
                       ),
@@ -395,7 +342,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                           });
                           Navigator.of(ctx).pop();
                         },
-                        child: const Text('Today'),
+                        child: Text('Today', style: theme.textTheme.bodyMedium),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
@@ -453,9 +400,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                   children: [
                     Text(
                       'Select Category',
-                      style: TextStyle(
+                      style: theme.textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.w600,
-                        fontSize: 16,
                         color: theme.colorScheme.onSurface,
                       ),
                     ),
@@ -506,7 +452,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                                 child: Text(
                                   c.name,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
+                                  style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.onSurface,
                                   ),
                                 ),
@@ -553,9 +499,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
+                      style: theme.textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.w600,
-                        fontSize: 16,
                         color: theme.colorScheme.onSurface,
                       ),
                     ),
@@ -579,9 +524,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                           return ExpansionTile(
                             title: Text(
                               group.name,
-                              style: TextStyle(
+                              style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                fontSize: 14,
                                 color: theme.colorScheme.onSurface,
                               ),
                             ),
@@ -600,8 +544,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                                 leading: const Icon(Icons.account_circle, size: 20),
                                 title: Text(
                                   acc.name,
-                                  style: TextStyle(
-                                    fontSize: 14,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.onSurface,
                                   ),
                                 ),
@@ -661,7 +604,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          title: const Text('New category'),
+          title: Text('New category', style: Theme.of(context).textTheme.headlineLarge),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -672,12 +615,12 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogCtx).pop(null),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             TextButton(
               onPressed: () =>
                   Navigator.of(dialogCtx).pop(controller.text.trim()),
-              child: const Text('Add'),
+              child: Text('Add', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -715,31 +658,54 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
     final rawAmount = _amountCtrl.text.trim();
     if (rawAmount.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an amount')),
+      );
       return;
     }
 
     // Parse the formatted amount string back to double
     final amountDouble = MoneyFormatter.parse(rawAmount);
     if (amountDouble <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Amount must be greater than zero')),
+      );
       return;
     }
 
     // Transfer handling
     if (_type == 'TRANSFER') {
       if (_fromAccountId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select the source account')),
+        );
         return;
       }
       if (_toAccountId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select the destination account')),
+        );
         return;
       }
-      // Transfer API is now implemented, continue with save logic
-    }
-
-    if (_type != 'TRANSFER' && _accountId == null) {
-      return;
-    }
-    if (_type != 'TRANSFER' && _categoryId == null) {
-      return;
+      if (_fromAccountId == _toAccountId) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Source and destination cannot be the same')),
+        );
+        return;
+      }
+    } else {
+        if (_accountId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select an account')),
+        );
+        return;
+      }
+      if (_categoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a category')),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -785,15 +751,23 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       }
       
       if (mounted) {
-        // Refresh accounts state to update account balances
-        if (mounted) {
-          final accountsState = context.read<AccountsState>();
-          await accountsState.refresh();
-        }
+        // Use addPostFrameCallback to ensure state changes happen after build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Refresh accounts state to update account balances
+          if (mounted) {
+            final accountsState = context.read<AccountsState>();
+            accountsState.refresh();
+          }
+        });
         
         Navigator.of(context).pop(true); // tell caller to refresh
       }
-    } catch (e) {
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to save transaction: $e')),
+          );
+        }
     } finally {
       if (mounted) {
         setState(() {
@@ -818,19 +792,19 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(isTransfer ? 'Delete Transfer' : 'Delete Transaction'),
+          title: Text(isTransfer ? 'Delete Transfer' : 'Delete Transaction', style: Theme.of(context).textTheme.headlineLarge),
           content: Text(isTransfer
             ? 'Are you sure you want to delete this transfer? Both the source and destination transactions will be deleted. This action cannot be undone.'
             : 'Are you sure you want to delete this transaction? This action cannot be undone.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
+              child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         );
@@ -855,11 +829,14 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       }
       
       if (mounted) {
-        // Refresh accounts state to update account balances
-        if (mounted) {
-          final accountsState = context.read<AccountsState>();
-          await accountsState.refresh();
-        }
+        // Use addPostFrameCallback to ensure state changes happen after build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Refresh accounts state to update account balances
+          if (mounted) {
+            final accountsState = context.read<AccountsState>();
+            accountsState.refresh();
+          }
+        });
         
         Navigator.of(context).pop(true); // tell caller to refresh
       }
@@ -887,9 +864,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     // Parse the string to double and format it
     try {
       final amount = double.tryParse(amountStr.replaceAll(',', '').replaceAll(' ', '')) ?? 0.0;
-      return MoneyFormatter.formatIDR(amount);
+      return MoneyFormatter.formatNumber(amount);
     } catch (e) {
-      return '$_currency $amountStr';
+      return amountStr;
     }
   }
 
@@ -910,9 +887,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               width: 90,
               child: Text(
                 label,
-                style: TextStyle(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  fontSize: 13,
                 ),
               ),
             ),
@@ -920,8 +896,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             Expanded(
               child: Text(
                 value,
-                style: TextStyle(
-                  fontSize: 14,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
               ),
@@ -953,9 +928,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             width: 90,
             child: Text(
               'Amount',
-              style: TextStyle(
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacity(0.6),
-                fontSize: 13,
               ),
             ),
           ),
@@ -966,19 +940,20 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               focusNode: _amountFocusNode,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                hintText: 'Rp 0',
+                hintText: '0',
+                prefixText: 'Rp ', // 👈 visual Rp only
                 border: InputBorder.none,
                 hintStyle: TextStyle(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
-              style: TextStyle(
+              style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurface,
-                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
               inputFormatters: [
-                _AmountInputFormatter(),
+                // Only digits, comma, dot
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
             ),
           ),
@@ -1040,9 +1015,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
+                          : Text(
                               'Delete',
-                              style: TextStyle(fontSize: 15),
+                              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
                             ),
                     ),
                   ),
@@ -1068,9 +1043,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                                 color: theme.colorScheme.onPrimary,
                               ),
                             )
-                          : const Text(
+                          : Text(
                               'Update',
-                              style: TextStyle(fontSize: 15),
+                              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
                             ),
                     ),
                   ),
@@ -1097,9 +1072,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                             color: theme.colorScheme.onPrimary,
                           ),
                         )
-                      : const Text(
+                      : Text(
                           'Save',
-                          style: TextStyle(fontSize: 15),
+                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
                         ),
                 ),
               ),
@@ -1135,9 +1110,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               width: 90,
               child: Text(
                 label,
-                style: TextStyle(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  fontSize: 13,
                 ),
               ),
             ),
@@ -1145,8 +1119,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             Expanded(
               child: Text(
                 value ?? 'Select account',
-                style: TextStyle(
-                  fontSize: 14,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: value != null
                       ? theme.colorScheme.onSurface
                       : theme.colorScheme.onSurface.withOpacity(0.6),
@@ -1175,9 +1148,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               width: 90,
               child: Text(
                 'Category',
-                style: TextStyle(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  fontSize: 13,
                 ),
               ),
             ),
@@ -1185,8 +1157,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             Expanded(
               child: Text(
                 _categoryName ?? 'Select category',
-                style: TextStyle(
-                  fontSize: 14,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: _categoryName != null
                       ? theme.colorScheme.onSurface
                       : theme.colorScheme.onSurface.withOpacity(0.6),
@@ -1230,8 +1201,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         const SizedBox(height: 24),
         Text(
           'Description',
-          style: TextStyle(
-            fontSize: 13,
+          style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
@@ -1267,8 +1237,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         const SizedBox(height: 24),
         Text(
           'Description',
-          style: TextStyle(
-            fontSize: 13,
+          style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
@@ -1288,7 +1257,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
-        title: Text(_titleText),
+        title: Text(_titleText, style: Theme.of(context).textTheme.headlineLarge),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

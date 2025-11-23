@@ -99,12 +99,9 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'Sign In',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 24),
                   TextFormField(
@@ -150,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                   if (_errorMessage != null)
                     Text(
                       _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.red),
                     ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -163,7 +160,7 @@ class _LoginPageState extends State<LoginPage> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Login'),
+                          : Text('Login', style: Theme.of(context).textTheme.bodyMedium),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -173,7 +170,7 @@ class _LoginPageState extends State<LoginPage> {
                         MaterialPageRoute(builder: (_) => const SignUpPage()),
                       );
                     },
-                    child: const Text("Don't have an account? Sign Up"),
+                    child: Text("Don't have an account? Sign Up", style: Theme.of(context).textTheme.bodyMedium),
                   ),
                 ],
               ),

@@ -73,7 +73,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accounts'),
+        title: Text('Accounts', style: Theme.of(context).textTheme.titleLarge),
         actions: [
           IconButton(
             onPressed: _logout,
@@ -96,15 +96,12 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Text(
                   'Welcome, $name',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 if (email.isNotEmpty)
                   Text(
                     email,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
                   ),
               ],
             ),

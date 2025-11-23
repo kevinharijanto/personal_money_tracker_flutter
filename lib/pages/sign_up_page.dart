@@ -97,7 +97,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Up'),
+        title: Text('Sign Up', style: Theme.of(context).textTheme.headlineLarge),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -109,12 +109,9 @@ class _SignUpPageState extends State<SignUpPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'Create Account',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 24),
                   TextFormField(
@@ -185,7 +182,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   if (_errorMessage != null)
                     Text(
                       _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.red),
                     ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -198,7 +195,7 @@ class _SignUpPageState extends State<SignUpPage> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Sign Up'),
+                          : Text('Sign Up', style: Theme.of(context).textTheme.bodyMedium),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -206,7 +203,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
-                    child: const Text('Already have an account? Sign In'),
+                    child: Text('Already have an account? Sign In', style: Theme.of(context).textTheme.bodyMedium),
                   ),
                 ],
               ),
