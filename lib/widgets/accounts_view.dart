@@ -230,8 +230,14 @@ class _AccountGroupSection extends StatelessWidget {
         ),
         // Content: editable reorderable list vs normal list
         isEditMode
-            ? _EditableAccountsList(group: group, compactLayout: compactLayout)
-            : _NormalAccountsList(group: group, compactLayout: compactLayout),
+            ? _EditableAccountsList(
+                group: group,
+                compactLayout: compactLayout,
+              )
+            : _NormalAccountsList(
+                group: group,
+                compactLayout: compactLayout,
+              ),
       ],
     );
   }
@@ -241,7 +247,10 @@ class _NormalAccountsList extends StatelessWidget {
   final AccountGroup group;
   final bool compactLayout;
 
-  const _NormalAccountsList({required this.group, required this.compactLayout});
+  const _NormalAccountsList({
+    required this.group,
+    required this.compactLayout,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -266,9 +275,9 @@ class _NormalAccountsList extends StatelessWidget {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
-                trailing: Text(
-                  balanceText,
-                  style: theme.textTheme.titleMedium?.copyWith(
+            trailing: Text(
+              balanceText,
+              style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Colors.blueAccent,
                   ),
@@ -310,7 +319,10 @@ class _EditableAccountsList extends StatelessWidget {
   final AccountGroup group;
   final bool compactLayout;
 
-  const _EditableAccountsList({required this.group, required this.compactLayout});
+  const _EditableAccountsList({
+    required this.group,
+    required this.compactLayout,
+  });
 
   @override
   Widget build(BuildContext context) {

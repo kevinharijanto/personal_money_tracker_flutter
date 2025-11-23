@@ -27,6 +27,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
   
   String? _selectedGroupId;
   String _selectedCurrency = 'IDR';
+  String _selectedScope = 'PERSONAL';
   bool _isArchived = false;
   List<AccountGroup> _accountGroups = [];
   bool _isLoading = false;
@@ -44,10 +45,14 @@ class _AccountFormPageState extends State<AccountFormPage> {
       _nameController.text = widget.account!.name;
       _balanceController.text = widget.account!.balance.toString();
       _selectedCurrency = widget.account!.currency;
+      _selectedScope = widget.account!.scope;
       _isArchived = widget.account!.isArchived;
       _selectedGroupId = widget.groupId; // This would need to be passed when editing
     } else if (widget.groupId != null) {
       _selectedGroupId = widget.groupId;
+      _balanceController.text = '0';
+    } else {
+      _balanceController.text = '0';
     }
 
     // Load account groups
@@ -97,8 +102,10 @@ class _AccountFormPageState extends State<AccountFormPage> {
           name: _nameController.text,
           groupId: _selectedGroupId!,
           currency: _selectedCurrency,
-          startingBalance: _balanceController.text,
+          startingBalance:
+              _balanceController.text.isEmpty ? '0' : _balanceController.text,
           isArchived: _isArchived,
+          scope: _selectedScope,
         );
       } else {
         // Update existing account
@@ -107,6 +114,9 @@ class _AccountFormPageState extends State<AccountFormPage> {
           name: _nameController.text,
           currency: _selectedCurrency,
           isArchived: _isArchived,
+          scope: _selectedScope,
+          startingBalance:
+              _balanceController.text.isEmpty ? '0' : _balanceController.text,
         );
       }
 
@@ -278,6 +288,24 @@ class _AccountFormPageState extends State<AccountFormPage> {
                       onChanged: (value) {
                         setState(() {
                           _selectedCurrency = value!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedScope,
+                      decoration: const InputDecoration(
+                        labelText: 'Scope',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem(value: 'PERSONAL', child: Text('Personal', style: Theme.of(context).textTheme.bodyMedium)),
+                        DropdownMenuItem(value: 'HOUSEHOLD', child: Text('Household', style: Theme.of(context).textTheme.bodyMedium)),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _selectedScope = value;
                         });
                       },
                     ),

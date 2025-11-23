@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../widgets/accounts_view.dart';
-import '../pages/account_form_page.dart';
 import '../state/accounts_state.dart';
 
 class AccountsPage extends StatefulWidget {
@@ -27,19 +26,6 @@ class _AccountsPageState extends State<AccountsPage> {
       final accountsState = context.read<AccountsState>();
       accountsState.load();
     });
-  }
-
-  Future<void> _openAddAccount() async {
-    final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const AccountFormPage(),
-      ),
-    );
-
-    if (changed == true && mounted) {
-      final accountsState = context.read<AccountsState>();
-      await accountsState.refresh();
-    }
   }
 
   @override

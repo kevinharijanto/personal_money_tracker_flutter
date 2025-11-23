@@ -6,6 +6,7 @@ import 'pages/accounts_page.dart';
 import 'pages/account_transactions_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/account_form_page.dart';
+import 'pages/stats_page.dart';
 import 'widgets/bottom_navigation_bar.dart' as custom;
 import 'ui/slide_transition_builder.dart'; // adjust the path
 import 'providers/theme_provider.dart';
@@ -54,7 +55,7 @@ class RootPage extends StatefulWidget {
 }
 
 class RootPageState extends State<RootPage> {
-  int _currentIndex = 0; // Start with Accounts page
+  int _currentIndex = 0;
   bool _isEditMode = false; // Edit mode for accounts page
   bool _isAuthenticated = false;
   bool _isCheckingAuth = true;
@@ -117,14 +118,14 @@ class RootPageState extends State<RootPage> {
       return const LoginPage();
     }
 
-    final bool showAppBar = _currentIndex != 0;
+    final bool showAppBar = _currentIndex == 2 || _currentIndex == 3;
 
     return Scaffold(
       appBar: showAppBar
           ? AppBar(
               title: Text(_getAppBarTitle(),
                   style: Theme.of(context).textTheme.headlineLarge),
-              actions: _currentIndex == 1
+              actions: _currentIndex == 2
                   ? [
                       IconButton(
                         onPressed: _toggleEditMode,
@@ -164,12 +165,14 @@ class RootPageState extends State<RootPage> {
           currentBalance: 0.0, // We don't have a total balance for all accounts
         );
       case 1:
+        return const StatsPage();
+      case 2:
         return AccountsPage(
           key: ValueKey('accounts_page_$_isAuthenticated'), // Change key when auth state changes
           isEditMode: _isEditMode,
           onToggleEditMode: _toggleEditMode,
         );
-      case 2:
+      case 3:
         return const SettingsPage(
           key: ValueKey('settings_page'),
         );
@@ -183,8 +186,10 @@ class RootPageState extends State<RootPage> {
       case 0:
         return 'Transactions';
       case 1:
-        return 'Accounts';
+        return 'Stats';
       case 2:
+        return 'Accounts';
+      case 3:
         return 'Settings';
       default:
         return 'Money Tracker';

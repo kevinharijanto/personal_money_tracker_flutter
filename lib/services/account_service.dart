@@ -50,11 +50,15 @@ class AccountService {
     required String name,
     required String currency,
     bool? isArchived,
+    String? scope,
+    String? startingBalance,
   }) async {
     final body = {
       'name': name,
       'currency': currency,
       if (isArchived != null) 'isArchived': isArchived,
+      if (scope != null) 'scope': scope,
+      if (startingBalance != null) 'startingBalance': startingBalance,
     };
 
     final res = await ApiClient.put('/api/accounts/$accountId', body);

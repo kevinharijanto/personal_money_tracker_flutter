@@ -4,6 +4,7 @@ class AccountModel {
   final String currency;
   final double balance;
   final bool isArchived;
+  final String scope;
 
   AccountModel({
     required this.id,
@@ -11,15 +12,20 @@ class AccountModel {
     required this.currency,
     required this.balance,
     required this.isArchived,
+    required this.scope,
   });
 
   factory AccountModel.fromJson(Map<String, dynamic> json) {
+    final rawScope = json['scope']?.toString();
+    final normalizedScope =
+        rawScope != null && rawScope.isNotEmpty ? rawScope.toUpperCase() : 'PERSONAL';
     return AccountModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       currency: json['currency']?.toString() ?? '',
       balance: double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0,
       isArchived: json['isArchived'] as bool? ?? false,
+      scope: normalizedScope,
     );
   }
 }
