@@ -9,10 +9,14 @@ import '../state/accounts_state.dart';
 
 class AccountsView extends StatelessWidget {
   final bool isEditMode;
+  final bool showSummaryBar;
+  final bool compactLayout;
 
   const AccountsView({
     super.key,
     this.isEditMode = false,
+    this.showSummaryBar = true,
+    this.compactLayout = false,
   });
 
   @override
@@ -54,18 +58,20 @@ class AccountsView extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: accountsState.refresh,
           child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: groups.length + 1, // +1 for summary header
+            padding:
+                compactLayout ? const EdgeInsets.only(bottom: 40) : const EdgeInsets.only(bottom: 80),
+            itemCount: groups.length + (showSummaryBar ? 1 : 0),
             itemBuilder: (context, index) {
-              if (index == 0) {
-                // Top summary bar (Assets | Liabilities | Total)
+              if (showSummaryBar && index == 0) {
                 return _AccountsSummaryBar(groups: groups);
               }
 
-              final group = groups[index - 1];
+              final groupIndex = showSummaryBar ? index - 1 : index;
+              final group = groups[groupIndex];
               return _AccountGroupSection(
                 group: group,
                 isEditMode: isEditMode,
+                compactLayout: compactLayout,
               );
             },
           ),
@@ -88,41 +94,23 @@ class _AccountsSummaryBar extends StatelessWidget {
     double assets = 0;
     double liabilities = 0;
 
-    // Debug print to see what data we're working with
-    debugPrint('=== Accounts Summary Debug ===');
-    debugPrint('Number of groups: ${groups.length}');
-    
     for (final g in groups) {
       final groupTotal = g.accounts.fold<double>(
         0,
         (sum, a) => sum + a.balance,
       );
-      debugPrint('Group: ${g.name}, Kind: "${g.kind}", Total: $groupTotal, Accounts: ${g.accounts.length}');
-      for (final account in g.accounts) {
-        debugPrint('  Account: ${account.name}, Balance: ${account.balance}');
-      }
-      
       if (g.kind.toUpperCase() == 'ASSET' || g.kind.toUpperCase() == 'BANK_ACCOUNTS' || g.kind.toUpperCase() == 'CASH' || g.kind.toUpperCase() == 'INVESTMENTS') {
         assets += groupTotal;
-        debugPrint('  -> Added to assets: $groupTotal');
       } else if (g.kind.toUpperCase() == 'LIABILITY' || g.kind.toUpperCase() == 'CREDIT_CARDS' || g.kind.toUpperCase() == 'LOANS') {
         liabilities += groupTotal;
-        debugPrint('  -> Added to liabilities: $groupTotal');
-      } else {
-        debugPrint('  -> Group kind "${g.kind}" does not match ASSET or LIABILITY categories');
       }
     }
-
-    debugPrint('Final Assets: $assets, Liabilities: $liabilities, Total: ${assets + liabilities}');
-    debugPrint('=== End Debug ===');
 
     final total = assets + liabilities;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-      ),
+      color: Colors.transparent,
       child: Row(
         children: [
           _SummaryItem(
@@ -189,10 +177,12 @@ class _SummaryItem extends StatelessWidget {
 class _AccountGroupSection extends StatelessWidget {
   final AccountGroup group;
   final bool isEditMode;
+  final bool compactLayout;
 
   const _AccountGroupSection({
     required this.group,
     required this.isEditMode,
+    required this.compactLayout,
   });
 
   @override
@@ -209,8 +199,11 @@ class _AccountGroupSection extends StatelessWidget {
       children: [
         // Group header row (like "Bank Jago   Rp 76,346,426.00")
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          padding: EdgeInsets.symmetric(
+            horizontal: compactLayout ? 14 : 16,
+            vertical: compactLayout ? 8 : 10,
+          ),
+          color: theme.colorScheme.surface,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -237,8 +230,8 @@ class _AccountGroupSection extends StatelessWidget {
         ),
         // Content: editable reorderable list vs normal list
         isEditMode
-            ? _EditableAccountsList(group: group)
-            : _NormalAccountsList(group: group),
+            ? _EditableAccountsList(group: group, compactLayout: compactLayout)
+            : _NormalAccountsList(group: group, compactLayout: compactLayout),
       ],
     );
   }
@@ -246,8 +239,9 @@ class _AccountGroupSection extends StatelessWidget {
 
 class _NormalAccountsList extends StatelessWidget {
   final AccountGroup group;
+  final bool compactLayout;
 
-  const _NormalAccountsList({required this.group});
+  const _NormalAccountsList({required this.group, required this.compactLayout});
 
   @override
   Widget build(BuildContext context) {
@@ -257,40 +251,55 @@ class _NormalAccountsList extends StatelessWidget {
       children: group.accounts.map((acc) {
         final balanceText = MoneyFormatter.formatIDR(acc.balance);
 
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          title: Text(
-            acc.name,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          trailing: Text(
-            balanceText,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Colors.blueAccent, // like screenshot
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () async {
-            final changed = await Navigator.of(context).push<bool>(
-              MaterialPageRoute(
-                builder: (_) => AccountTransactionsPage(
-                  accountId: acc.id,
-                  accountName: acc.name,
-                  currency: acc.currency,
-                  currentBalance: 0,
-                  showAppBar: true,
+        return Column(
+          children: [
+            Container(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+              child: ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: compactLayout ? 12 : 16,
+                  vertical: compactLayout ? 0 : 4,
                 ),
-              ),
-            );
+                title: Text(
+                  acc.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                trailing: Text(
+                  balanceText,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blueAccent,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => AccountTransactionsPage(
+                        accountId: acc.id,
+                        accountName: acc.name,
+                        currency: acc.currency,
+                        currentBalance: 0,
+                        showAppBar: true,
+                      ),
+                    ),
+                  );
 
-            if (changed == true) {
-              final accountsState = context.read<AccountsState>();
-              await accountsState.refresh();
-            }
-          },
+                  if (changed == true) {
+                    final accountsState = context.read<AccountsState>();
+                    await accountsState.refresh();
+                  }
+                },
+              ),
+            ),
+            Divider(
+              height: 0,
+              thickness: 0.5,
+              indent: compactLayout ? 0 : 0,
+            ),
+          ],
         );
       }).toList(),
     );
@@ -299,8 +308,9 @@ class _NormalAccountsList extends StatelessWidget {
 
 class _EditableAccountsList extends StatelessWidget {
   final AccountGroup group;
+  final bool compactLayout;
 
-  const _EditableAccountsList({required this.group});
+  const _EditableAccountsList({required this.group, required this.compactLayout});
 
   @override
   Widget build(BuildContext context) {
@@ -325,62 +335,76 @@ class _EditableAccountsList extends StatelessWidget {
           return ReorderableDragStartListener(
             key: ValueKey(acc.id),
             index: index,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              leading: const Icon(Icons.drag_handle, color: Colors.grey),
-              title: Text(
-                acc.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 18),
-                    onPressed: () async {
+            child: Column(
+              children: [
+                Container(
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: compactLayout ? 12 : 16,
+                      vertical: compactLayout ? 0 : 4,
+                    ),
+                    leading: const Icon(Icons.drag_handle, color: Colors.grey),
+                    title: Text(
+                      acc.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 18),
+                          onPressed: () async {
+                            final changed = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => AccountFormPage(
+                                  account: acc,
+                                  groupId: group.id,
+                                ),
+                              ),
+                            );
+
+                            if (changed == true) {
+                              await accountsState.refresh();
+                            }
+                          },
+                        ),
+                        Text(
+                          balanceText,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                    onTap: () async {
                       final changed = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
-                          builder: (_) => AccountFormPage(
-                            account: acc,
-                            groupId: group.id,
+                          builder: (_) => AccountTransactionsPage(
+                            accountId: acc.id,
+                            accountName: acc.name,
+                            currency: acc.currency,
+                            currentBalance: 0,
+                            showAppBar: true,
                           ),
                         ),
                       );
-
                       if (changed == true) {
                         await accountsState.refresh();
                       }
                     },
                   ),
-                  Text(
-                    balanceText,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ],
-              ),
-              onTap: () async {
-                final changed = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => AccountTransactionsPage(
-                      accountId: acc.id,
-                      accountName: acc.name,
-                      currency: acc.currency,
-                      currentBalance: 0,
-                      showAppBar: true,
-                    ),
-                  ),
-                );
-
-                if (changed == true) {
-                  await accountsState.refresh();
-                }
-              },
+                ),
+                Divider(
+                  height: 0,
+                  thickness: 0.5,
+                  indent: compactLayout ? 0 : 0,
+                ),
+              ],
             ),
           );
         }).toList(),

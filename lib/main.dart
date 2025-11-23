@@ -117,22 +117,30 @@ class RootPageState extends State<RootPage> {
       return const LoginPage();
     }
 
+    final bool showAppBar = _currentIndex != 0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_getAppBarTitle(), style: Theme.of(context).textTheme.headlineLarge),
-        actions: _currentIndex == 1 ? [
-          IconButton(
-            onPressed: _toggleEditMode,
-            icon: Icon(_isEditMode ? Icons.check : Icons.edit),
-            tooltip: _isEditMode ? 'Done Editing' : 'Edit Accounts',
-          ),
-          IconButton(
-            onPressed: _openAddAccount,
-            icon: const Icon(Icons.add),
-            tooltip: 'Add Account',
-          ),
-        ] : null,
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              title: Text(_getAppBarTitle(),
+                  style: Theme.of(context).textTheme.headlineLarge),
+              actions: _currentIndex == 1
+                  ? [
+                      IconButton(
+                        onPressed: _toggleEditMode,
+                        icon: Icon(_isEditMode ? Icons.check : Icons.edit),
+                        tooltip:
+                            _isEditMode ? 'Done Editing' : 'Edit Accounts',
+                      ),
+                      IconButton(
+                        onPressed: _openAddAccount,
+                        icon: const Icon(Icons.add),
+                        tooltip: 'Add Account',
+                      ),
+                    ]
+                  : null,
+            )
+          : null,
       body: _buildCurrentPage(),
       bottomNavigationBar: custom.BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -154,7 +162,6 @@ class RootPageState extends State<RootPage> {
           accountName: 'Select Account',
           currency: 'IDR',
           currentBalance: 0.0, // We don't have a total balance for all accounts
-          showAppBar: false, // Hide AppBar since it's shown in the root page
         );
       case 1:
         return AccountsPage(
