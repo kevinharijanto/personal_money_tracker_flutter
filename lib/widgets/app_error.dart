@@ -38,7 +38,7 @@ class AppError extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: Text(retryText!, style: Theme.of(context).textTheme.bodyMedium),
+                label: Text(retryText!),
               ),
             ],
           ],

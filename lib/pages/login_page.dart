@@ -30,6 +30,213 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _showPasswordChangeDialog() async {
+    final dialogEmailController =
+        TextEditingController(text: _emailController.text.trim());
+    final oldPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool oldPasswordObscured = true;
+    bool newPasswordObscured = true;
+    bool confirmPasswordObscured = true;
+    final formKey =
+        GlobalKey<FormState>(debugLabel: 'login_change_password_form');
+    String? dialogError;
+    bool dialogLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              if (!(formKey.currentState?.validate() ?? false)) {
+                return;
+              }
+
+              setDialogState(() {
+                dialogLoading = true;
+                dialogError = null;
+              });
+
+              try {
+                final loginRes = await _authService.login(
+                  email: dialogEmailController.text.trim(),
+                  password: oldPasswordController.text,
+                );
+
+                await _authService.changePassword(
+                  oldPassword: oldPasswordController.text,
+                  newPassword: newPasswordController.text,
+                  token: loginRes.token,
+                );
+
+                if (!mounted) return;
+                Navigator.of(dialogContext).pop();
+
+                _emailController.text = dialogEmailController.text.trim();
+                _passwordController.text = newPasswordController.text;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('Password updated. Please sign in with the new password.'),
+                  ),
+                );
+              } catch (e) {
+                setDialogState(() {
+                  dialogError = e.toString();
+                });
+              } finally {
+                setDialogState(() {
+                  dialogLoading = false;
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Change Password'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: dialogEmailController,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Email is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: oldPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Current Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              oldPasswordObscured
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                oldPasswordObscured = !oldPasswordObscured;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: oldPasswordObscured,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Current password is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: newPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              newPasswordObscured
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                newPasswordObscured = !newPasswordObscured;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: newPasswordObscured,
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'New password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              confirmPasswordObscured
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                confirmPasswordObscured =
+                                    !confirmPasswordObscured;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: confirmPasswordObscured,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please confirm new password';
+                          }
+                          if (value != newPasswordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (dialogError != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          dialogError!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Theme.of(context).colorScheme.error),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: dialogLoading
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: dialogLoading ? null : submit,
+                  child: dialogLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Update Password'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _login() async {
   if (!(_formKey.currentState?.validate() ?? false)) {
     return;
@@ -147,7 +354,9 @@ class _LoginPageState extends State<LoginPage> {
                   if (_errorMessage != null)
                     Text(
                       _errorMessage!,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.red),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                     ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -160,17 +369,25 @@ class _LoginPageState extends State<LoginPage> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text('Login', style: Theme.of(context).textTheme.bodyMedium),
+                          : const Text('Login'),
                     ),
                   ),
                   const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _showPasswordChangeDialog,
+                      child: const Text('Change Password'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const SignUpPage()),
                       );
                     },
-                    child: Text("Don't have an account? Sign Up", style: Theme.of(context).textTheme.bodyMedium),
+                    child: const Text("Don't have an account? Sign Up"),
                   ),
                 ],
               ),

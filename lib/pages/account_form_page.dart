@@ -29,6 +29,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
   String _selectedCurrency = 'IDR';
   String _selectedScope = 'PERSONAL';
   bool _isArchived = false;
+  bool _includeInTotals = true;
   List<AccountGroup> _accountGroups = [];
   bool _isLoading = false;
   bool _isLoadingGroups = true;
@@ -47,6 +48,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
       _selectedCurrency = widget.account!.currency;
       _selectedScope = widget.account!.scope;
       _isArchived = widget.account!.isArchived;
+      _includeInTotals = widget.account!.includeInTotals;
       _selectedGroupId = widget.groupId; // This would need to be passed when editing
     } else if (widget.groupId != null) {
       _selectedGroupId = widget.groupId;
@@ -106,6 +108,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
               _balanceController.text.isEmpty ? '0' : _balanceController.text,
           isArchived: _isArchived,
           scope: _selectedScope,
+          includeInTotals: _includeInTotals,
         );
       } else {
         // Update existing account
@@ -117,6 +120,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
           scope: _selectedScope,
           startingBalance:
               _balanceController.text.isEmpty ? '0' : _balanceController.text,
+          includeInTotals: _includeInTotals,
         );
       }
 
@@ -166,11 +170,11 @@ class _AccountFormPageState extends State<AccountFormPage> {
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
-                        child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+                        child: const Text('Cancel'),
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(true),
-                        child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
+                        child: const Text('Delete'),
                       ),
                     ],
                   ),
@@ -310,6 +314,21 @@ class _AccountFormPageState extends State<AccountFormPage> {
                       },
                     ),
                     const SizedBox(height: 16),
+                    SwitchListTile.adaptive(
+                      title: Text('Add to totals', style: Theme.of(context).textTheme.bodyMedium),
+                      subtitle: Text(
+                        'Disable to exclude this account from the Assets bar and group totals.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      value: _includeInTotals,
+                      onChanged: (value) {
+                        setState(() {
+                          _includeInTotals = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
                     CheckboxListTile(
                       title: Text('Archived', style: Theme.of(context).textTheme.bodyMedium),
                       value: _isArchived,
@@ -329,7 +348,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(isEditing ? 'Update' : 'Create', style: Theme.of(context).textTheme.bodyMedium),
+                          : Text(isEditing ? 'Update' : 'Create'),
                     ),
                   ],
                 ),

@@ -183,7 +183,6 @@ class _StatsPageState extends State<StatsPage> {
                       return ListView(
                         padding: const EdgeInsets.all(24),
                         children: [
-                          _buildModeSelector(),
                           const SizedBox(height: 12),
                           _buildDateSelector(),
                           const SizedBox(height: 24),
@@ -204,7 +203,6 @@ class _StatsPageState extends State<StatsPage> {
                     return ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        _buildModeSelector(),
                         const SizedBox(height: 12),
                         _buildDateSelector(),
                         const SizedBox(height: 16),
@@ -258,7 +256,9 @@ class _StatsPageState extends State<StatsPage> {
                   ),
                   Text(
                     'Income & Expense overview',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                 ],
               ),
@@ -274,7 +274,7 @@ class _StatsPageState extends State<StatsPage> {
 
   Widget _buildModeSelector() {
     final theme = Theme.of(context);
-    final highlight = Colors.redAccent;
+    final highlight = theme.colorScheme.secondary;
     final idle = theme.textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey;
 
     return Row(
@@ -353,9 +353,20 @@ class _StatsPageState extends State<StatsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Income', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+              Text(
+                'Income',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(MoneyFormatter.formatIDR(income), style: theme.textTheme.titleMedium?.copyWith(color: Colors.blueAccent, fontWeight: FontWeight.w700)),
+              Text(
+                MoneyFormatter.formatIDR(income),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.tertiary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
@@ -363,9 +374,20 @@ class _StatsPageState extends State<StatsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Expenses', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+              Text(
+                'Expenses',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(MoneyFormatter.formatIDR(expense), style: theme.textTheme.titleMedium?.copyWith(color: Colors.redAccent, fontWeight: FontWeight.w700)),
+              Text(
+                MoneyFormatter.formatIDR(expense),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
@@ -416,7 +438,9 @@ class _StatsPageState extends State<StatsPage> {
                   'Expenses',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.titleSmall?.copyWith(
-                    color: _selectedType == 'EXPENSE' ? Colors.redAccent : theme.textTheme.bodySmall?.color,
+                    color: _selectedType == 'EXPENSE'
+                        ? theme.colorScheme.error
+                        : theme.textTheme.bodySmall?.color,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

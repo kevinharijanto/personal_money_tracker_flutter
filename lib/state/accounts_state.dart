@@ -95,6 +95,7 @@ class AccountsState extends ChangeNotifier {
     required String startingBalance,
     bool isArchived = false,
     String scope = 'PERSONAL',
+    bool includeInTotals = true,
   }) async {
     final userId = await AuthStorage.getUserId();
     if (userId == null) {
@@ -109,6 +110,7 @@ class AccountsState extends ChangeNotifier {
       isArchived: isArchived,
       scope: scope,
       ownerUserId: userId,
+      includeInTotals: includeInTotals,
     );
 
     await refresh();
@@ -122,6 +124,7 @@ class AccountsState extends ChangeNotifier {
     required bool isArchived,
     required String scope,
     required String startingBalance,
+    required bool includeInTotals,
   }) async {
     await _accountService.updateAccount(
       accountId: accountId,
@@ -131,6 +134,7 @@ class AccountsState extends ChangeNotifier {
       scope: scope,
       startingBalance:
           startingBalance.isEmpty ? null : startingBalance,
+      includeInTotals: includeInTotals,
     );
 
     await refresh();

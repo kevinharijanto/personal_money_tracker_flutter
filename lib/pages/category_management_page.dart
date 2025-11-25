@@ -73,7 +73,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -81,7 +81,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: Text('Add', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Add'),
             ),
           ],
         );
@@ -143,7 +143,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -151,7 +151,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: Text('Save', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Save'),
             ),
           ],
         );
@@ -194,15 +194,15 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
               ),
-              child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Delete'),
             ),
           ],
         );
@@ -256,7 +256,7 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _showAddCategoryDialog,
-                    child: Text('Add Category', style: Theme.of(context).textTheme.bodyMedium),
+                    child: const Text('Add Category'),
                   ),
                 ],
               ),
@@ -281,12 +281,18 @@ class _CategoryManagementPageState extends State<CategoryManagementPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          icon: Icon(
+                            Icons.edit,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                           onPressed: () => _showEditCategoryDialog(category),
                           tooltip: 'Edit',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(
+                            Icons.delete,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                           onPressed: () => _showDeleteConfirmation(category),
                           tooltip: 'Delete',
                         ),

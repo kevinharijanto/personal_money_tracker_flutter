@@ -21,6 +21,7 @@ class AccountService {
     bool isArchived = false,
     String scope = "PERSONAL",
     required String ownerUserId,
+    bool includeInTotals = true,
   }) async {
     final body = {
       'name': name,
@@ -30,6 +31,7 @@ class AccountService {
       'isArchived': isArchived,
       'scope': scope,
       'ownerUserId': ownerUserId,
+      'includeInTotals': includeInTotals,
     };
 
     final res = await ApiClient.post('/api/accounts', body);
@@ -52,6 +54,7 @@ class AccountService {
     bool? isArchived,
     String? scope,
     String? startingBalance,
+    bool? includeInTotals,
   }) async {
     final body = {
       'name': name,
@@ -59,6 +62,7 @@ class AccountService {
       if (isArchived != null) 'isArchived': isArchived,
       if (scope != null) 'scope': scope,
       if (startingBalance != null) 'startingBalance': startingBalance,
+      if (includeInTotals != null) 'includeInTotals': includeInTotals,
     };
 
     final res = await ApiClient.put('/api/accounts/$accountId', body);

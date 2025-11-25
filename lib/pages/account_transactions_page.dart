@@ -352,7 +352,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -387,7 +387,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -630,7 +630,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   }
 
   Widget _buildModeTabs(ThemeData theme) {
-    final Color highlight = Colors.redAccent;
+    final Color highlight = theme.colorScheme.secondary;
     final Color idle =
         theme.textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey;
 
@@ -702,21 +702,24 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   }
 
   Widget _buildSummaryRow(double income, double expense, double total) {
+    final theme = Theme.of(context);
+    final positiveColor = theme.colorScheme.tertiary;
+    final negativeColor = theme.colorScheme.error;
     return Row(
       children: [
-        _summaryStat('Income', income, Colors.blueAccent),
+        _summaryStat('Income', income, positiveColor),
         _summaryDivider(),
         _summaryStat(
           'Expenses',
           expense,
-          Colors.redAccent,
+          negativeColor,
           compactValue: true,
         ),
         _summaryDivider(),
         _summaryStat(
           'Total',
           total,
-          total >= 0 ? Colors.blueAccent : Colors.redAccent,
+          total >= 0 ? positiveColor : negativeColor,
         ),
       ],
     );
@@ -810,7 +813,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
                         child: _dayAmountTile(
                           'Income',
                           income,
-                          Colors.blueAccent,
+                          theme.colorScheme.tertiary,
                         ),
                       ),
                     ),
@@ -820,7 +823,7 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
                         child: _dayAmountTile(
                           'Expenses',
                           expense,
-                          Colors.redAccent,
+                          theme.colorScheme.error,
                         ),
                       ),
                     ),
@@ -913,13 +916,14 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
   }
 
   Color _weekdayBadgeColor(int weekday) {
+    final theme = Theme.of(context);
     if (weekday == DateTime.sunday) {
-      return Colors.redAccent;
+      return theme.colorScheme.error;
     }
     if (weekday == DateTime.saturday) {
-      return Colors.deepPurpleAccent;
+      return theme.colorScheme.secondary;
     }
-    return Colors.grey;
+    return theme.colorScheme.primary.withOpacity(0.8);
   }
 
 
@@ -958,8 +962,8 @@ class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
     final isTransfer = t.transferGroupId != null;
     final bool transferIn = isTransfer ? t.amount >= 0 : false;
     final Color accent = isTransfer
-        ? (transferIn ? Colors.blueAccent : Colors.redAccent)
-        : (isExpense ? Colors.redAccent : Colors.blueAccent);
+        ? (transferIn ? theme.colorScheme.tertiary : theme.colorScheme.error)
+        : (isExpense ? theme.colorScheme.error : theme.colorScheme.tertiary);
     final IconData icon = isTransfer
         ? (transferIn
             ? Icons.call_received_rounded

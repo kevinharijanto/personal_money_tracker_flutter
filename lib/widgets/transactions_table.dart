@@ -71,9 +71,9 @@ class _TransactionRow extends StatelessWidget {
 
     Color amountColor;
     if (isExpense) {
-      amountColor = Colors.redAccent;
+      amountColor = theme.colorScheme.error;
     } else if (isIncome) {
-      amountColor = Colors.blueAccent;
+      amountColor = theme.colorScheme.tertiary;
     } else {
       amountColor = theme.colorScheme.onSurface; // transfer
     }

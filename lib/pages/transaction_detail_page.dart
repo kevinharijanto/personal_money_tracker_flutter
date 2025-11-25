@@ -259,11 +259,11 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     Color typeColor(String t) {
       switch (t) {
         case 'INCOME':
-          return Colors.green;
+          return theme.colorScheme.tertiary;
         case 'TRANSFER':
-          return Colors.blue;
+          return theme.colorScheme.primary;
         default:
-          return Colors.red;
+          return theme.colorScheme.error;
       }
     }
 
@@ -385,6 +385,11 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       backgroundColor: Colors.transparent, // No shadow background
       builder: (ctx) {
         final theme = Theme.of(context);
+        final highlightColor = _type == 'INCOME'
+            ? theme.colorScheme.tertiary
+            : (_type == 'TRANSFER'
+                ? theme.colorScheme.primary
+                : theme.colorScheme.error);
         return Container(
           height: MediaQuery.of(context).size.height * 0.5, // Keyboard-style height
           decoration: BoxDecoration(
@@ -435,7 +440,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
                                     color: c.id == _categoryId
-                                        ? Colors.redAccent
+                                        ? highlightColor
                                         : Colors.grey.shade500,
                                   ),
                                   shape: RoundedRectangleBorder(
@@ -549,7 +554,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                                   ),
                                 ),
                                 trailing: isSelected
-                                    ? const Icon(Icons.check, color: Colors.green)
+                                    ? Icon(
+                                        Icons.check,
+                                        color: theme.colorScheme.tertiary,
+                                      )
                                     : null,
                                 onTap: () {
                                   // Prevent transfer to same account
@@ -615,12 +623,12 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogCtx).pop(null),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () =>
                   Navigator.of(dialogCtx).pop(controller.text.trim()),
-              child: Text('Add', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Add'),
             ),
           ],
         );
@@ -799,12 +807,14 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Delete'),
             ),
           ],
         );
@@ -1000,25 +1010,25 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                     child: ElevatedButton(
                       onPressed: _isSaving ? null : _onDeletePressed,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: theme.colorScheme.error,
+                        foregroundColor: theme.colorScheme.onError,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                       child: _isSaving
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  theme.colorScheme.onError,
+                                ),
                               ),
                             )
-                          : Text(
-                              'Delete',
-                              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
-                            ),
+                          : const Text('Delete'),
                     ),
                   ),
                   const SizedBox(width: 12),

@@ -95,10 +95,9 @@ class _AccountsSummaryBar extends StatelessWidget {
     double liabilities = 0;
 
     for (final g in groups) {
-      final groupTotal = g.accounts.fold<double>(
-        0,
-        (sum, a) => sum + a.balance,
-      );
+      final groupTotal = g.accounts
+          .where((a) => a.includeInTotals)
+          .fold<double>(0, (sum, a) => sum + a.balance);
       if (g.kind.toUpperCase() == 'ASSET' || g.kind.toUpperCase() == 'BANK_ACCOUNTS' || g.kind.toUpperCase() == 'CASH' || g.kind.toUpperCase() == 'INVESTMENTS') {
         assets += groupTotal;
       } else if (g.kind.toUpperCase() == 'LIABILITY' || g.kind.toUpperCase() == 'CREDIT_CARDS' || g.kind.toUpperCase() == 'LOANS') {
@@ -116,17 +115,17 @@ class _AccountsSummaryBar extends StatelessWidget {
           _SummaryItem(
             label: 'Assets',
             amount: assets,
-            color: Colors.blueAccent,
+            color: theme.colorScheme.tertiary,
           ),
           _SummaryItem(
             label: 'Liabilities',
             amount: liabilities,
-            color: Colors.redAccent,
+            color: theme.colorScheme.error,
           ),
           _SummaryItem(
             label: 'Total',
             amount: total,
-            color: theme.colorScheme.onSurface,
+            color: theme.colorScheme.secondary,
           ),
         ],
       ),
@@ -189,10 +188,9 @@ class _AccountGroupSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final groupTotal = group.accounts.fold<double>(
-      0,
-      (sum, a) => sum + a.balance,
-    );
+    final groupTotal = group.accounts
+        .where((a) => a.includeInTotals)
+        .fold<double>(0, (sum, a) => sum + a.balance);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,7 +219,7 @@ class _AccountGroupSection extends StatelessWidget {
                 MoneyFormatter.formatIDR(groupTotal),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                  color: theme.colorScheme.secondary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -259,6 +257,13 @@ class _NormalAccountsList extends StatelessWidget {
     return Column(
       children: group.accounts.map((acc) {
         final balanceText = MoneyFormatter.formatIDR(acc.balance);
+        final isExcluded = !acc.includeInTotals;
+        final titleColor = isExcluded
+            ? theme.colorScheme.onSurface.withOpacity(0.4)
+            : theme.colorScheme.onSurface;
+        final balanceColor = isExcluded
+            ? theme.colorScheme.onSurfaceVariant.withOpacity(0.7)
+            : theme.colorScheme.tertiary;
 
         return Column(
           children: [
@@ -272,14 +277,14 @@ class _NormalAccountsList extends StatelessWidget {
                 title: Text(
                   acc.name,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
+                    color: titleColor,
                   ),
                 ),
-            trailing: Text(
-              balanceText,
-              style: theme.textTheme.titleMedium?.copyWith(
+                trailing: Text(
+                  balanceText,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: Colors.blueAccent,
+                    color: balanceColor,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -360,7 +365,9 @@ class _EditableAccountsList extends StatelessWidget {
                     title: Text(
                       acc.name,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
+                        color: acc.includeInTotals
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurface.withOpacity(0.4),
                       ),
                     ),
                     trailing: Row(
@@ -387,6 +394,10 @@ class _EditableAccountsList extends StatelessWidget {
                           balanceText,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
+                            color: acc.includeInTotals
+                                ? theme.colorScheme.tertiary
+                                : theme.colorScheme.onSurfaceVariant
+                                    .withOpacity(0.7),
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,

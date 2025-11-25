@@ -8,6 +8,7 @@ import 'account_group_management_page.dart';
 import 'accounts_page.dart';
 import 'login_page.dart';
 import '../state/accounts_state.dart';
+import '../services/auth_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -21,6 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String? _name;
   String? _email;
   bool _isDarkMode = false;
+  final AuthService _authService = AuthService();
 
   final List<Map<String, String>> _timezones = [
     {'value': 'UTC', 'label': 'UTC (Coordinated Universal Time)'},
@@ -112,6 +114,191 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _showSettingsPasswordDialog() async {
+    final oldPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool oldPasswordObscured = true;
+    bool newPasswordObscured = true;
+    bool confirmPasswordObscured = true;
+    final formKey =
+        GlobalKey<FormState>(debugLabel: 'settings_change_password_form');
+    String? dialogError;
+    bool dialogLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              if (!(formKey.currentState?.validate() ?? false)) {
+                return;
+              }
+
+              setDialogState(() {
+                dialogLoading = true;
+                dialogError = null;
+              });
+
+              try {
+                final token = await AuthStorage.getToken();
+                if (token == null || token.isEmpty) {
+                  throw Exception('Session expired. Please log in again.');
+                }
+
+                await _authService.changePassword(
+                  oldPassword: oldPasswordController.text,
+                  newPassword: newPasswordController.text,
+                  token: token,
+                );
+
+                if (!mounted) return;
+                Navigator.of(dialogContext).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Password updated successfully.')),
+                );
+              } catch (e) {
+                setDialogState(() {
+                  dialogError = e.toString();
+                });
+              } finally {
+                setDialogState(() {
+                  dialogLoading = false;
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Change Password'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: oldPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Current Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              oldPasswordObscured
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                oldPasswordObscured = !oldPasswordObscured;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: oldPasswordObscured,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Current password is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: newPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              newPasswordObscured
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                newPasswordObscured = !newPasswordObscured;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: newPasswordObscured,
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'New password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              confirmPasswordObscured
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                confirmPasswordObscured =
+                                    !confirmPasswordObscured;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: confirmPasswordObscured,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please confirm new password';
+                          }
+                          if (value != newPasswordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (dialogError != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          dialogError!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Theme.of(context).colorScheme.error),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: dialogLoading
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: dialogLoading ? null : submit,
+                  child: dialogLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Update Password'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = _name ?? 'User';
@@ -144,6 +331,38 @@ class _SettingsPageState extends State<SettingsPage> {
                       email,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                     ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Security',
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Keep your account secure by updating your password regularly.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    leading: Icon(
+                      Icons.password,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text('Change Password', style: Theme.of(context).textTheme.bodyMedium),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: _showSettingsPasswordDialog,
+                  ),
                 ],
               ),
             ),
@@ -222,7 +441,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(height: 16),
                   ListTile(
-                    leading: const Icon(Icons.trending_up, color: Colors.green),
+                    leading: Icon(
+                      Icons.trending_up,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
                     title: Text('Income Category Setting', style: Theme.of(context).textTheme.bodyMedium),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
@@ -238,7 +460,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const Divider(),
                   ListTile(
-                    leading: const Icon(Icons.trending_down, color: Colors.red),
+                    leading: Icon(
+                      Icons.trending_down,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                     title: Text('Expenses Category Setting', style: Theme.of(context).textTheme.bodyMedium),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () {
@@ -276,7 +501,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(height: 16),
                   ListTile(
-                    leading: const Icon(Icons.account_balance, color: Colors.blue),
+                    leading: Icon(
+                      Icons.account_balance,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     title: Text('Account Groups', style: Theme.of(context).textTheme.bodyMedium),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: () async {
@@ -366,8 +594,8 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: const Icon(Icons.logout),
               label: const Text('Log Out'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

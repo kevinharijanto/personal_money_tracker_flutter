@@ -5,6 +5,7 @@ class AccountModel {
   final double balance;
   final bool isArchived;
   final String scope;
+  final bool includeInTotals;
 
   AccountModel({
     required this.id,
@@ -13,7 +14,8 @@ class AccountModel {
     required this.balance,
     required this.isArchived,
     required this.scope,
-  });
+    bool? includeInTotals,
+  }) : includeInTotals = includeInTotals ?? true;
 
   factory AccountModel.fromJson(Map<String, dynamic> json) {
     final rawScope = json['scope']?.toString();
@@ -26,7 +28,20 @@ class AccountModel {
       balance: double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0,
       isArchived: json['isArchived'] as bool? ?? false,
       scope: normalizedScope,
+      includeInTotals: _parseIncludeInTotals(json['includeInTotals']),
     );
+  }
+
+  static bool _parseIncludeInTotals(dynamic raw) {
+    if (raw == null) return true;
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    if (raw is String) {
+      final normalized = raw.trim().toLowerCase();
+      if (normalized.isEmpty) return true;
+      return normalized != 'false' && normalized != '0' && normalized != 'no';
+    }
+    return true;
   }
 }
 

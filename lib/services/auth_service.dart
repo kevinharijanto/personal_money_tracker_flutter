@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../utils/api_error.dart';
+import '../storage/auth_storage.dart';
 
 class LoginResponse {
   final String token;
@@ -41,6 +42,36 @@ class AuthService {
       return LoginResponse(token: token, user: user);
     } else {
       // Use the same error handling pattern as ApiClient
+      final msg = ApiErrorUtils.extractMessage(response);
+      throw Exception(msg);
+    }
+  }
+
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+    String? token,
+  }) async {
+    final authToken = token ?? await AuthStorage.getToken();
+    if (authToken == null || authToken.isEmpty) {
+      throw Exception('Not authenticated. Please log in again.');
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/mobile/password/change');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       final msg = ApiErrorUtils.extractMessage(response);
       throw Exception(msg);
     }
