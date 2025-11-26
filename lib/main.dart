@@ -8,11 +8,11 @@ import 'pages/settings_page.dart';
 import 'pages/account_form_page.dart';
 import 'pages/stats_page.dart';
 import 'widgets/bottom_navigation_bar.dart' as custom;
-import 'ui/slide_transition_builder.dart'; // adjust the path
 import 'providers/theme_provider.dart';
 import 'services/api_client.dart';
 import 'state/accounts_state.dart';
 import 'state/transactions_state.dart';
+import 'state/household_state.dart';
 
 void main() {
   runApp(const MyApp());
@@ -25,6 +25,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => HouseholdState()),
         ChangeNotifierProvider(create: (_) => AccountsState()),
         ChangeNotifierProvider(create: (_) => TransactionsState()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
@@ -79,15 +80,6 @@ class RootPageState extends State<RootPage> {
     super.dispose();
   }
 
-  Future<void> _logout() async {
-    await AuthStorage.clear();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
-  }
-
   void _toggleEditMode() {
     setState(() {
       _isEditMode = !_isEditMode;
@@ -95,22 +87,16 @@ class RootPageState extends State<RootPage> {
   }
 
   Future<void> _openAddAccount() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const AccountFormPage(),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AccountFormPage()));
   }
 
   @override
   Widget build(BuildContext context) {
     // Show loading while checking authentication
     if (_isCheckingAuth) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Show login page if not authenticated
@@ -123,15 +109,16 @@ class RootPageState extends State<RootPage> {
     return Scaffold(
       appBar: showAppBar
           ? AppBar(
-              title: Text(_getAppBarTitle(),
-                  style: Theme.of(context).textTheme.headlineLarge),
+              title: Text(
+                _getAppBarTitle(),
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
               actions: _currentIndex == 2
                   ? [
                       IconButton(
                         onPressed: _toggleEditMode,
                         icon: Icon(_isEditMode ? Icons.check : Icons.edit),
-                        tooltip:
-                            _isEditMode ? 'Done Editing' : 'Edit Accounts',
+                        tooltip: _isEditMode ? 'Done Editing' : 'Edit Accounts',
                       ),
                       IconButton(
                         onPressed: _openAddAccount,
@@ -158,7 +145,9 @@ class RootPageState extends State<RootPage> {
     switch (_currentIndex) {
       case 0:
         return AccountTransactionsPage(
-          key: ValueKey('transactions_page_$_isAuthenticated'), // Change key when auth state changes
+          key: ValueKey(
+            'transactions_page_$_isAuthenticated',
+          ), // Change key when auth state changes
           accountId: '', // Empty string to indicate all accounts
           accountName: 'Select Account',
           currency: 'IDR',
@@ -168,14 +157,14 @@ class RootPageState extends State<RootPage> {
         return const StatsPage();
       case 2:
         return AccountsPage(
-          key: ValueKey('accounts_page_$_isAuthenticated'), // Change key when auth state changes
+          key: ValueKey(
+            'accounts_page_$_isAuthenticated',
+          ), // Change key when auth state changes
           isEditMode: _isEditMode,
           onToggleEditMode: _toggleEditMode,
         );
       case 3:
-        return const SettingsPage(
-          key: ValueKey('settings_page'),
-        );
+        return const SettingsPage(key: ValueKey('settings_page'));
       default:
         return const SizedBox.shrink();
     }

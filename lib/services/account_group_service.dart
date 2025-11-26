@@ -9,25 +9,27 @@ class AccountGroupService {
     final res = await ApiClient.get('/api/account-groups', useCache: useCache);
 
     final List<dynamic> data = jsonDecode(res.body) as List<dynamic>;
-    
+
     // Debug print to see the raw API response
     debugPrint('=== Account Groups API Response ===');
     debugPrint('Response body: ${res.body}');
     debugPrint('Number of groups: ${data.length}');
-    
+
     final groups = data
         .map((e) => AccountGroup.fromJson(e as Map<String, dynamic>))
         .toList();
-    
+
     // Debug print the parsed groups
     for (final group in groups) {
-      debugPrint('Group: ${group.name}, Kind: "${group.kind}", Accounts: ${group.accounts.length}');
+      debugPrint(
+        'Group: ${group.name}, Kind: "${group.kind}", Accounts: ${group.accounts.length}',
+      );
       for (final account in group.accounts) {
         debugPrint('  Account: ${account.name}, Balance: ${account.balance}');
       }
     }
     debugPrint('=== End API Response Debug ===');
-    
+
     return groups;
   }
 
@@ -37,10 +39,7 @@ class AccountGroupService {
     required String name,
     required String kind,
   }) async {
-    final body = {
-      'name': name,
-      'kind': kind,
-    };
+    final body = {'name': name, 'kind': kind};
 
     final res = await ApiClient.post('/api/account-groups', body);
 
@@ -56,10 +55,7 @@ class AccountGroupService {
     required String name,
     required String kind,
   }) async {
-    final body = {
-      'name': name,
-      'kind': kind,
-    };
+    final body = {'name': name, 'kind': kind};
 
     final res = await ApiClient.put('/api/account-groups/$groupId', body);
 
@@ -71,5 +67,20 @@ class AccountGroupService {
   /// DELETE /api/account-groups/YOUR_GROUP_ID
   Future<void> deleteAccountGroup(String groupId) async {
     await ApiClient.delete('/api/account-groups/$groupId');
+  }
+
+  Future<List<AccountGroup>> fetchAccountGroupsForHousehold(
+    String householdId,
+  ) async {
+    final res = await ApiClient.get(
+      '/api/account-groups',
+      useCache: false,
+      householdIdOverride: householdId,
+    );
+
+    final List<dynamic> data = jsonDecode(res.body) as List<dynamic>;
+    return data
+        .map((e) => AccountGroup.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }

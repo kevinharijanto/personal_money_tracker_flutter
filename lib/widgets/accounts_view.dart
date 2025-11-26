@@ -36,7 +36,9 @@ class AccountsView extends StatelessWidget {
           );
         }
 
-        final groups = accountsState.groups;
+        final groups = accountsState.groups
+            .where((g) => g.accounts.isNotEmpty)
+            .toList();
 
         if (groups.isEmpty) {
           return RefreshIndicator(
@@ -58,8 +60,9 @@ class AccountsView extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: accountsState.refresh,
           child: ListView.builder(
-            padding:
-                compactLayout ? const EdgeInsets.only(bottom: 40) : const EdgeInsets.only(bottom: 80),
+            padding: compactLayout
+                ? const EdgeInsets.only(bottom: 40)
+                : const EdgeInsets.only(bottom: 80),
             itemCount: groups.length + (showSummaryBar ? 1 : 0),
             itemBuilder: (context, index) {
               if (showSummaryBar && index == 0) {
@@ -96,11 +99,16 @@ class _AccountsSummaryBar extends StatelessWidget {
 
     for (final g in groups) {
       final groupTotal = g.accounts
-          .where((a) => a.includeInTotals)
+          .where((a) => a.includeInTotals && a.scope.toUpperCase() == 'HOUSEHOLD',)
           .fold<double>(0, (sum, a) => sum + a.balance);
-      if (g.kind.toUpperCase() == 'ASSET' || g.kind.toUpperCase() == 'BANK_ACCOUNTS' || g.kind.toUpperCase() == 'CASH' || g.kind.toUpperCase() == 'INVESTMENTS') {
+      if (g.kind.toUpperCase() == 'ASSET' ||
+          g.kind.toUpperCase() == 'BANK_ACCOUNTS' ||
+          g.kind.toUpperCase() == 'CASH' ||
+          g.kind.toUpperCase() == 'INVESTMENTS') {
         assets += groupTotal;
-      } else if (g.kind.toUpperCase() == 'LIABILITY' || g.kind.toUpperCase() == 'CREDIT_CARDS' || g.kind.toUpperCase() == 'LOANS') {
+      } else if (g.kind.toUpperCase() == 'LIABILITY' ||
+          g.kind.toUpperCase() == 'CREDIT_CARDS' ||
+          g.kind.toUpperCase() == 'LOANS') {
         liabilities += groupTotal;
       }
     }
@@ -228,14 +236,8 @@ class _AccountGroupSection extends StatelessWidget {
         ),
         // Content: editable reorderable list vs normal list
         isEditMode
-            ? _EditableAccountsList(
-                group: group,
-                compactLayout: compactLayout,
-              )
-            : _NormalAccountsList(
-                group: group,
-                compactLayout: compactLayout,
-              ),
+            ? _EditableAccountsList(group: group, compactLayout: compactLayout)
+            : _NormalAccountsList(group: group, compactLayout: compactLayout),
       ],
     );
   }
@@ -245,10 +247,7 @@ class _NormalAccountsList extends StatelessWidget {
   final AccountGroup group;
   final bool compactLayout;
 
-  const _NormalAccountsList({
-    required this.group,
-    required this.compactLayout,
-  });
+  const _NormalAccountsList({required this.group, required this.compactLayout});
 
   @override
   Widget build(BuildContext context) {
@@ -308,11 +307,7 @@ class _NormalAccountsList extends StatelessWidget {
                 },
               ),
             ),
-            Divider(
-              height: 0,
-              thickness: 0.5,
-              indent: compactLayout ? 0 : 0,
-            ),
+            Divider(height: 0, thickness: 0.5, indent: compactLayout ? 0 : 0),
           ],
         );
       }).toList(),
@@ -335,9 +330,7 @@ class _EditableAccountsList extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Theme(
-      data: theme.copyWith(
-        canvasColor: Colors.transparent,
-      ),
+      data: theme.copyWith(canvasColor: Colors.transparent),
       child: ReorderableListView(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -376,14 +369,15 @@ class _EditableAccountsList extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.edit, size: 18),
                           onPressed: () async {
-                            final changed = await Navigator.of(context).push<bool>(
-                              MaterialPageRoute(
-                                builder: (_) => AccountFormPage(
-                                  account: acc,
-                                  groupId: group.id,
-                                ),
-                              ),
-                            );
+                            final changed = await Navigator.of(context)
+                                .push<bool>(
+                                  MaterialPageRoute(
+                                    builder: (_) => AccountFormPage(
+                                      account: acc,
+                                      groupId: group.id,
+                                    ),
+                                  ),
+                                );
 
                             if (changed == true) {
                               await accountsState.refresh();
@@ -397,7 +391,7 @@ class _EditableAccountsList extends StatelessWidget {
                             color: acc.includeInTotals
                                 ? theme.colorScheme.tertiary
                                 : theme.colorScheme.onSurfaceVariant
-                                    .withOpacity(0.7),
+                                      .withOpacity(0.7),
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,

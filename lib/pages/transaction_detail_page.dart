@@ -7,10 +7,10 @@ import '../models/account_group.dart';
 import '../services/transaction_service.dart';
 import '../services/category_service.dart';
 import '../services/account_group_service.dart';
-import '../services/api_client.dart';
 import '../utils/money_formatter.dart';
 import '../state/accounts_state.dart';
 import '../state/transactions_state.dart';
+import '../state/household_state.dart';
 
 class TransactionDetailPage extends StatefulWidget {
   final String? transactionId;
@@ -47,8 +47,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
   TransactionModel? _tx;
 
-  bool _isLoading = true;      // loading transaction
-  bool _isMetaLoading = true;  // loading categories + accounts
+  bool _isLoading = true; // loading transaction
+  bool _isMetaLoading = true; // loading categories + accounts
   bool _isSaving = false;
 
   String _type = 'EXPENSE';
@@ -69,6 +69,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   String? _categoryName;
 
   String _currency = 'Rp';
+  final Map<String, List<AccountGroup>> _householdAccountGroups = {};
+  String? _accountHouseholdId;
+  String? _fromAccountHouseholdId;
+  String? _toAccountHouseholdId;
 
   final TextEditingController _amountCtrl = TextEditingController();
   final TextEditingController _descCtrl = TextEditingController();
@@ -78,7 +82,6 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   List<CategoryModel> _incomeCategories = [];
   List<CategoryModel> _expenseCategories = [];
   List<CategoryModel> _activeCategories = [];
-  List<AccountGroup> _accountGroups = [];
 
   @override
   void initState() {
@@ -104,7 +107,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           final value = MoneyFormatter.parse(_amountCtrl.text);
           if (value > 0) {
             // THIS is the key change: use formatNumber, not formatIDR
-            _amountCtrl.text = MoneyFormatter.formatNumber(value); // e.g. 10,000.00
+            _amountCtrl.text = MoneyFormatter.formatNumber(
+              value,
+            ); // e.g. 10,000.00
             _amountCtrl.selection = TextSelection.fromPosition(
               TextPosition(offset: _amountCtrl.text.length),
             );
@@ -117,6 +122,11 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   }
 
   Future<void> _init() async {
+    final householdState = context.read<HouseholdState>();
+    if (!householdState.hasData && !householdState.isLoading) {
+      await householdState.load();
+    }
+
     // 1. Load existing tx if editing
     if (widget.isExisting) {
       await _loadExistingTransaction();
@@ -125,6 +135,13 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       _accountName = widget.initialAccountName;
       _categoryId = widget.initialCategoryId;
       _categoryName = widget.initialCategoryName;
+
+      final selectedHouseholdId = context
+          .read<HouseholdState>()
+          .selectedHouseholdId;
+      _accountHouseholdId = selectedHouseholdId;
+      _fromAccountHouseholdId = selectedHouseholdId;
+      _toAccountHouseholdId = selectedHouseholdId;
 
       if (_accountId == null) {
         _accountName = null; // this will make the UI show "Select account"
@@ -160,6 +177,12 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       _accountName = tx.accountName;
       _categoryId = tx.categoryId;
       _categoryName = tx.categoryName;
+      final currentHouseholdId = context
+          .read<HouseholdState>()
+          .selectedHouseholdId;
+      _accountHouseholdId = currentHouseholdId;
+      _fromAccountHouseholdId = currentHouseholdId;
+      _toAccountHouseholdId = currentHouseholdId;
     } catch (e) {
       // Error loading transaction
     } finally {
@@ -172,18 +195,40 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     if (mounted) setState(() {});
 
     try {
+      final householdState = context.read<HouseholdState>();
+      final households = householdState.households;
+
+      final accountGroupFutures = households.map((household) async {
+        final groups = await _accountService.fetchAccountGroupsForHousehold(
+          household.id,
+        );
+        return MapEntry(
+          household.id,
+          groups.where((group) => group.accounts.isNotEmpty).toList(),
+        );
+      }).toList();
+
       final results = await Future.wait([
-        _accountService.fetchAccountGroups(useCache: true),
+        ...accountGroupFutures,
         _categoryService.fetchCategories('INCOME', useCache: true),
         _categoryService.fetchCategories('EXPENSE', useCache: true),
       ]);
 
-      _accountGroups = results[0] as List<AccountGroup>;
-      _incomeCategories = results[1] as List<CategoryModel>;
-      _expenseCategories = results[2] as List<CategoryModel>;
+      _householdAccountGroups.clear();
+      for (var i = 0; i < accountGroupFutures.length; i++) {
+        final entry = results[i] as MapEntry<String, List<AccountGroup>>;
+        if (entry.value.isNotEmpty) {
+          _householdAccountGroups[entry.key] = entry.value;
+        }
+      }
 
-      _activeCategories =
-          _type == 'INCOME' ? _incomeCategories : _expenseCategories;
+      final incomeIndex = accountGroupFutures.length;
+      _incomeCategories = results[incomeIndex] as List<CategoryModel>;
+      _expenseCategories = results[incomeIndex + 1] as List<CategoryModel>;
+
+      _activeCategories = _type == 'INCOME'
+          ? _incomeCategories
+          : _expenseCategories;
     } catch (e) {
       // Error loading meta
     } finally {
@@ -210,7 +255,6 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     }
   }
 
-
   // ----------------- TYPE TABS -----------------
 
   void _setType(String t) {
@@ -229,7 +273,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         } else if (_type == 'EXPENSE') {
           _activeCategories = _expenseCategories;
         } else {
-          _activeCategories = _expenseCategories; // Use expense categories for transfers
+          _activeCategories =
+              _expenseCategories; // Use expense categories for transfers
         }
       }
 
@@ -277,8 +322,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
-                backgroundColor:
-                    selected ? baseColor.withOpacity(0.12) : Colors.transparent,
+                backgroundColor: selected
+                    ? baseColor.withOpacity(0.12)
+                    : Colors.transparent,
                 side: BorderSide(
                   color: selected ? baseColor : Colors.grey.shade400,
                 ),
@@ -321,8 +367,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             child: Column(
               children: [
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Text(
@@ -388,10 +436,11 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         final highlightColor = _type == 'INCOME'
             ? theme.colorScheme.tertiary
             : (_type == 'TRANSFER'
-                ? theme.colorScheme.primary
-                : theme.colorScheme.error);
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.error);
         return Container(
-          height: MediaQuery.of(context).size.height * 0.5, // Keyboard-style height
+          height:
+              MediaQuery.of(context).size.height * 0.5, // Keyboard-style height
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -400,7 +449,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             children: [
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     Text(
@@ -490,7 +542,8 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       builder: (ctx) {
         final theme = Theme.of(context);
         return Container(
-          height: MediaQuery.of(context).size.height * 0.7, // Keyboard-style height
+          height:
+              MediaQuery.of(context).size.height * 0.7, // Keyboard-style height
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -499,7 +552,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             children: [
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     Text(
@@ -522,76 +578,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               Expanded(
                 child: _isMetaLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                        itemCount: _accountGroups.length,
-                        itemBuilder: (ctx, index) {
-                          final group = _accountGroups[index];
-                          return ExpansionTile(
-                            title: Text(
-                              group.name,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                            children: group.accounts.map((acc) {
-                              final isSelected = () {
-                                if (target == 'from') {
-                                  return acc.id == _fromAccountId;
-                                } else if (target == 'to') {
-                                  return acc.id == _toAccountId;
-                                }
-                                return acc.id == _accountId;
-                              }();
-
-                              return ListTile(
-                                dense: true,
-                                leading: const Icon(Icons.account_circle, size: 20),
-                                title: Text(
-                                  acc.name,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                                trailing: isSelected
-                                    ? Icon(
-                                        Icons.check,
-                                        color: theme.colorScheme.tertiary,
-                                      )
-                                    : null,
-                                onTap: () {
-                                  // Prevent transfer to same account
-                                  if (target == 'to' &&
-                                      acc.id == _fromAccountId) {
-                                    return;
-                                  }
-                                  if (target == 'from' &&
-                                      acc.id == _toAccountId) {
-                                    return;
-                                  }
-
-                                  setState(() {
-                                    if (target == 'from') {
-                                      _fromAccountId = acc.id;
-                                      _fromAccountName =
-                                          '${acc.name} (${group.name})';
-                                    } else if (target == 'to') {
-                                      _toAccountId = acc.id;
-                                      _toAccountName =
-                                          '${acc.name} (${group.name})';
-                                    } else {
-                                      _accountId = acc.id;
-                                      _accountName =
-                                          '${acc.name} (${group.name})';
-                                    }
-                                    _currency = acc.currency;
-                                  });
-                                  Navigator.of(ctx).pop();
-                                },
-                              );
-                            }).toList(),
-                          );
-                        },
+                    : _buildHouseholdAccountList(
+                        sheetContext: ctx,
+                        theme: theme,
+                        target: target,
                       ),
               ),
             ],
@@ -601,6 +591,132 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     );
   }
 
+  Widget _buildHouseholdAccountList({
+    required BuildContext sheetContext,
+    required ThemeData theme,
+    String? target,
+  }) {
+    final householdState = context.read<HouseholdState>();
+    final households = householdState.households
+        .where((h) => (_householdAccountGroups[h.id]?.isNotEmpty ?? false))
+        .toList();
+
+    if (households.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'No accounts found in your households.',
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      children: households.map((household) {
+        final groups = _householdAccountGroups[household.id] ?? [];
+        return ExpansionTile(
+          key: ValueKey('household_${household.id}'),
+          title: Text(
+            household.name,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          children: groups.map((group) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    group.name,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+                ...group.accounts.map((acc) {
+                  final isSelected = target == 'from'
+                      ? acc.id == _fromAccountId
+                      : target == 'to'
+                      ? acc.id == _toAccountId
+                      : acc.id == _accountId;
+
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.account_circle, size: 20),
+                    title: Text(acc.name, style: theme.textTheme.bodyMedium),
+                    trailing: isSelected
+                        ? Icon(Icons.check, color: theme.colorScheme.tertiary)
+                        : null,
+                    onTap: () => _selectAccountFromHousehold(
+                      account: acc,
+                      householdId: household.id,
+                      householdName: household.name,
+                      target: target,
+                      sheetContext: sheetContext,
+                    ),
+                  );
+                }),
+                const Divider(height: 0),
+              ],
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
+  }
+
+  void _selectAccountFromHousehold({
+    required AccountModel account,
+    required String householdId,
+    required String householdName,
+    required BuildContext sheetContext,
+    String? target,
+  }) {
+    if (target == 'to' && account.id == _fromAccountId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Source and destination cannot be the same account.'),
+        ),
+      );
+      return;
+    }
+    if (target == 'from' && account.id == _toAccountId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Source and destination cannot be the same account.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      if (target == 'from') {
+        _fromAccountId = account.id;
+        _fromAccountName = '${account.name} ($householdName)';
+        _fromAccountHouseholdId = householdId;
+      } else if (target == 'to') {
+        _toAccountId = account.id;
+        _toAccountName = '${account.name} ($householdName)';
+        _toAccountHouseholdId = householdId;
+      } else {
+        _accountId = account.id;
+        _accountName = '${account.name} ($householdName)';
+        _accountHouseholdId = householdId;
+        _currency = account.currency;
+      }
+    });
+
+    Navigator.of(sheetContext).pop();
+  }
 
   Future<void> _addCategoryForCurrentType(BuildContext sheetContext) async {
     final type = _type; // 'INCOME' or 'EXPENSE'
@@ -612,13 +728,14 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          title: Text('New category', style: Theme.of(context).textTheme.headlineLarge),
+          title: Text(
+            'New category',
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
           content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Category name',
-            ),
+            decoration: const InputDecoration(labelText: 'Category name'),
           ),
           actions: [
             TextButton(
@@ -654,9 +771,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         _categoryId = created.id;
         _categoryName = created.name;
       });
-
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   // ----------------- SAVE -----------------
@@ -666,9 +781,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
     final rawAmount = _amountCtrl.text.trim();
     if (rawAmount.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an amount')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter an amount')));
       return;
     }
 
@@ -691,20 +806,34 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
       }
       if (_toAccountId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select the destination account')),
+          const SnackBar(
+            content: Text('Please select the destination account'),
+          ),
         );
         return;
       }
       if (_fromAccountId == _toAccountId) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Source and destination cannot be the same')),
+          const SnackBar(
+            content: Text('Source and destination cannot be the same'),
+          ),
         );
         return;
       }
     } else {
-        if (_accountId == null) {
+      if (_accountId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please select an account')),
+        );
+        return;
+      }
+      if (_accountHouseholdId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to determine household for the selected account',
+            ),
+          ),
         );
         return;
       }
@@ -722,10 +851,17 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
     try {
       // Convert local date to UTC at noon to avoid timezone issues
-      final dateUtc = DateTime(_date.year, _date.month, _date.day, 12, 0, 0).toUtc();
-      
+      final dateUtc = DateTime(
+        _date.year,
+        _date.month,
+        _date.day,
+        12,
+        0,
+        0,
+      ).toUtc();
+
       final transactionsState = context.read<TransactionsState>();
-      
+
       if (_type == 'TRANSFER') {
         // Create transfer
         await transactionsState.createTransfer(
@@ -734,6 +870,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           amount: amountDouble.toString(),
           date: dateUtc,
           description: _descCtrl.text.trim(),
+          householdId: _fromAccountHouseholdId,
         );
       } else if (widget.isExisting) {
         // Update existing transaction
@@ -745,6 +882,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           amount: amountDouble.toString(),
           date: dateUtc,
           description: _descCtrl.text.trim(),
+          householdId: _accountHouseholdId,
         );
       } else {
         // Create new transaction
@@ -755,9 +893,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
           amount: amountDouble.toString(),
           date: dateUtc,
           description: _descCtrl.text.trim(),
+          householdId: _accountHouseholdId,
         );
       }
-      
+
       if (mounted) {
         // Use addPostFrameCallback to ensure state changes happen after build
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -767,15 +906,15 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             accountsState.refresh();
           }
         });
-        
+
         Navigator.of(context).pop(true); // tell caller to refresh
       }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to save transaction: $e')),
-          );
-        }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save transaction: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -794,16 +933,21 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
     // Check if this is a transfer transaction
     final isTransfer = _tx?.transferGroupId != null;
-    
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(isTransfer ? 'Delete Transfer' : 'Delete Transaction', style: Theme.of(context).textTheme.headlineLarge),
-          content: Text(isTransfer
-            ? 'Are you sure you want to delete this transfer? Both the source and destination transactions will be deleted. This action cannot be undone.'
-            : 'Are you sure you want to delete this transaction? This action cannot be undone.'),
+          title: Text(
+            isTransfer ? 'Delete Transfer' : 'Delete Transaction',
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
+          content: Text(
+            isTransfer
+                ? 'Are you sure you want to delete this transfer? Both the source and destination transactions will be deleted. This action cannot be undone.'
+                : 'Are you sure you want to delete this transaction? This action cannot be undone.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -829,7 +973,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
     try {
       final transactionsState = context.read<TransactionsState>();
-      
+
       if (isTransfer && _tx?.transferGroupId != null) {
         // Delete the entire transfer (both transactions)
         await transactionsState.deleteTransfer(_tx!.transferGroupId!);
@@ -837,7 +981,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         // Delete single transaction
         await transactionsState.deleteTransaction(widget.transactionId!);
       }
-      
+
       if (mounted) {
         // Use addPostFrameCallback to ensure state changes happen after build
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -847,7 +991,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             accountsState.refresh();
           }
         });
-        
+
         Navigator.of(context).pop(true); // tell caller to refresh
       }
     } catch (e) {
@@ -873,7 +1017,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   String _formatCurrencyFromString(String amountStr) {
     // Parse the string to double and format it
     try {
-      final amount = double.tryParse(amountStr.replaceAll(',', '').replaceAll(' ', '')) ?? 0.0;
+      final amount =
+          double.tryParse(amountStr.replaceAll(',', '').replaceAll(' ', '')) ??
+          0.0;
       return MoneyFormatter.formatNumber(amount);
     } catch (e) {
       return amountStr;
@@ -911,10 +1057,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                 ),
               ),
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              trailing,
-            ],
+            if (trailing != null) ...[const SizedBox(width: 8), trailing],
             if (onTap != null) ...[
               const SizedBox(width: 8),
               Icon(
@@ -948,7 +1091,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             child: TextFormField(
               controller: _amountCtrl,
               focusNode: _amountFocusNode,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 hintText: '0',
                 prefixText: 'Rp ', // 👈 visual Rp only
@@ -967,10 +1112,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
               ],
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: 8),
-            trailing,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 8), trailing],
         ],
       ),
     );
@@ -1000,8 +1142,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding:
-            const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
+        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
         child: widget.isExisting
             ? Row(
                 children: [
@@ -1055,7 +1196,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                             )
                           : Text(
                               'Update',
-                              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 15,
+                              ),
                             ),
                     ),
                   ),
@@ -1084,7 +1227,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                         )
                       : Text(
                           'Save',
-                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 15,
+                          ),
                         ),
                 ),
               ),
@@ -1097,7 +1242,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   Widget _buildInlineAccountSelector({String? target}) {
     String label;
     String? value;
-    
+
     if (target == 'from') {
       label = 'From';
       value = _fromAccountName;
@@ -1188,8 +1333,6 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
   Widget _buildIncomeExpenseBody() {
     final theme = Theme.of(context);
-    final accountLabel = _accountName ?? 'Select account';
-    final categoryLabel = _categoryName ?? 'Select category';
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1224,8 +1367,6 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
 
   Widget _buildTransferBody() {
     final theme = Theme.of(context);
-    final fromLabel = _fromAccountName ?? 'Select source account';
-    final toLabel = _toAccountName ?? 'Select destination account';
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1267,7 +1408,10 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
-        title: Text(_titleText, style: Theme.of(context).textTheme.headlineLarge),
+        title: Text(
+          _titleText,
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -4,6 +4,7 @@ import '../models/account_group.dart';
 import '../services/account_group_service.dart';
 import '../services/account_service.dart';
 import '../storage/auth_storage.dart';
+import '../storage/include_totals_storage.dart';
 
 class AccountsState extends ChangeNotifier {
   final AccountGroupService _groupService;
@@ -12,8 +13,8 @@ class AccountsState extends ChangeNotifier {
   AccountsState({
     AccountGroupService? groupService,
     AccountService? accountService,
-  })  : _groupService = groupService ?? AccountGroupService(),
-        _accountService = accountService ?? AccountService();
+  }) : _groupService = groupService ?? AccountGroupService(),
+       _accountService = accountService ?? AccountService();
 
   bool _isLoading = false;
   String? _error;
@@ -35,9 +36,21 @@ class AccountsState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result =
-          await _groupService.fetchAccountGroups(useCache: !force);
-      _groups = result;
+      final result = await _groupService.fetchAccountGroups(useCache: !force);
+      final overrides = await IncludeTotalsStorage.getOverrides();
+      _groups = result
+          .map(
+            (group) => group.copyWith(
+              accounts: group.accounts
+                  .map(
+                    (acc) => overrides.containsKey(acc.id)
+                        ? acc.copyWith(includeInTotals: overrides[acc.id])
+                        : acc,
+                  )
+                  .toList(),
+            ),
+          )
+          .toList();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -88,7 +101,7 @@ class AccountsState extends ChangeNotifier {
   }
 
   /// Create a new account and refresh data.
-  Future<void> createAccount({
+  Future<AccountModel> createAccount({
     required String name,
     required String groupId,
     required String currency,
@@ -102,7 +115,7 @@ class AccountsState extends ChangeNotifier {
       throw Exception('User ID not found. Please log in again.');
     }
 
-    await _accountService.createAccount(
+    final createdAccount = await _accountService.createAccount(
       name: name,
       groupId: groupId,
       currency: currency,
@@ -114,10 +127,11 @@ class AccountsState extends ChangeNotifier {
     );
 
     await refresh();
+    return createdAccount;
   }
 
   /// Update an existing account and refresh.
-  Future<void> updateAccount({
+  Future<AccountModel> updateAccount({
     required String accountId,
     required String name,
     required String currency,
@@ -126,24 +140,31 @@ class AccountsState extends ChangeNotifier {
     required String startingBalance,
     required bool includeInTotals,
   }) async {
-    await _accountService.updateAccount(
+    final updatedAccount = await _accountService.updateAccount(
       accountId: accountId,
       name: name,
       currency: currency,
       isArchived: isArchived,
       scope: scope,
-      startingBalance:
-          startingBalance.isEmpty ? null : startingBalance,
+      startingBalance: startingBalance.isEmpty ? null : startingBalance,
       includeInTotals: includeInTotals,
     );
 
     await refresh();
+    return updatedAccount;
   }
 
   /// Delete an account and refresh.
   Future<void> deleteAccount(String accountId) async {
     await _accountService.deleteAccount(accountId);
     await refresh();
+  }
+
+    void clear() {
+    _groups = [];
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
   }
 
 }

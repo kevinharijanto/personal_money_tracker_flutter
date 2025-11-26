@@ -15,4 +15,17 @@ class HouseholdService {
         .map((item) => Household.fromJson(item as Map<String, dynamic>))
         .toList();
   }
+
+  Future<Household> renameHousehold({
+    required String householdId,
+    required String name,
+  }) async {
+    final res = await ApiClient.put('/api/households/$householdId', {
+      'name': name,
+    });
+
+    final Map<String, dynamic> json =
+        jsonDecode(res.body) as Map<String, dynamic>;
+    return Household.fromJson(json);
+  }
 }

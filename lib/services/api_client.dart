@@ -21,13 +21,14 @@ class ApiClient {
   static final Map<String, Future<http.Response>> _inFlightRequests = {};
 
   /// Build base headers (Authorization, Household, etc.)
-  static Future<Map<String, String>> _buildHeaders() async {
+  static Future<Map<String, String>> _buildHeaders({
+    String? householdIdOverride,
+  }) async {
     final token = await AuthStorage.getToken();
-    final householdId = await AuthStorage.getHouseholdId();
+    final householdId =
+        householdIdOverride ?? await AuthStorage.getHouseholdId();
 
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final headers = <String, String>{'Content-Type': 'application/json'};
 
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -45,8 +46,12 @@ class ApiClient {
     String endpoint, {
     bool useCache = true,
     Duration? cacheExpiration,
+    String? householdIdOverride,
   }) async {
-    final requestKey = CacheService.generateKey(endpoint, null);
+    final cacheParams = householdIdOverride == null
+        ? null
+        : {'householdId': householdIdOverride};
+    final requestKey = CacheService.generateKey(endpoint, cacheParams);
 
     // Reuse in-flight request if identical
     if (_inFlightRequests.containsKey(requestKey)) {
@@ -62,7 +67,10 @@ class ApiClient {
     }
 
     // Create the actual request
-    final requestFuture = _executeGetRequest(endpoint);
+    final requestFuture = _executeGetRequest(
+      endpoint,
+      householdIdOverride: householdIdOverride,
+    );
     _inFlightRequests[requestKey] = requestFuture;
 
     try {
@@ -87,8 +95,13 @@ class ApiClient {
   }
 
   /// Internal low-level GET (no error handling here)
-  static Future<http.Response> _executeGetRequest(String endpoint) async {
-    final headers = await _buildHeaders();
+  static Future<http.Response> _executeGetRequest(
+    String endpoint, {
+    String? householdIdOverride,
+  }) async {
+    final headers = await _buildHeaders(
+      householdIdOverride: householdIdOverride,
+    );
     final uri = Uri.parse('$baseUrl$endpoint');
     return http.get(uri, headers: headers);
   }
@@ -96,9 +109,12 @@ class ApiClient {
   /// POST with centralized error handling + cache invalidation
   static Future<http.Response> post(
     String endpoint,
-    Map<String, dynamic> body,
-  ) async {
-    final headers = await _buildHeaders();
+    Map<String, dynamic> body, {
+    String? householdIdOverride,
+  }) async {
+    final headers = await _buildHeaders(
+      householdIdOverride: householdIdOverride,
+    );
     final uri = Uri.parse('$baseUrl$endpoint');
 
     final response = await http.post(
@@ -117,9 +133,12 @@ class ApiClient {
   /// PUT with centralized error handling + cache invalidation
   static Future<http.Response> put(
     String endpoint,
-    Map<String, dynamic> body,
-  ) async {
-    final headers = await _buildHeaders();
+    Map<String, dynamic> body, {
+    String? householdIdOverride,
+  }) async {
+    final headers = await _buildHeaders(
+      householdIdOverride: householdIdOverride,
+    );
     final uri = Uri.parse('$baseUrl$endpoint');
 
     final response = await http.put(
@@ -136,8 +155,13 @@ class ApiClient {
   }
 
   /// DELETE with centralized error handling + cache invalidation
-  static Future<http.Response> delete(String endpoint) async {
-    final headers = await _buildHeaders();
+  static Future<http.Response> delete(
+    String endpoint, {
+    String? householdIdOverride,
+  }) async {
+    final headers = await _buildHeaders(
+      householdIdOverride: householdIdOverride,
+    );
     final uri = Uri.parse('$baseUrl$endpoint');
 
     final response = await http.delete(uri, headers: headers);

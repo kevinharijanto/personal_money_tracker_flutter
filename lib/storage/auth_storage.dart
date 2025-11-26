@@ -7,6 +7,7 @@ class AuthStorage {
   static const String _userEmailKey = 'user_email';
   static const String _householdIdKey = 'household_id';
   static const String _userIdKey = 'user_id';
+  static const String _preferredHouseholdPrefix = 'preferred_household_';
   static const String _darkModeKey = 'is_dark_mode';
 
   static Future<void> saveLogin({
@@ -27,6 +28,10 @@ class AuthStorage {
   static Future<void> setHouseholdId(String id) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_householdIdKey, id);
+    final userId = prefs.getString(_userIdKey);
+    if (userId != null && userId.isNotEmpty) {
+      await prefs.setString('$_preferredHouseholdPrefix$userId', id);
+    }
   }
 
   static Future<String?> getToken() async {
@@ -54,15 +59,26 @@ class AuthStorage {
     return prefs.getString(_userIdKey);
   }
 
+  static Future<String?> getPreferredHouseholdId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString(_userIdKey);
+    if (userId == null || userId.isEmpty) return null;
+    return prefs.getString('$_preferredHouseholdPrefix$userId');
+  }
+
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString(_userIdKey);
     await prefs.remove(_tokenKey);
     await prefs.remove(_userNameKey);
     await prefs.remove(_userEmailKey);
     await prefs.remove(_householdIdKey);
     await prefs.remove(_userIdKey);
     await prefs.remove(_darkModeKey);
-    
+    if (userId != null && userId.isNotEmpty) {
+      await prefs.remove('$_preferredHouseholdPrefix$userId');
+    }
+
     // Clear API cache when logging out
     ApiClient.clearAllCache();
   }

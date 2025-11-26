@@ -11,8 +11,8 @@ class TransactionsState extends ChangeNotifier {
   TransactionsState({
     TransactionService? transactionService,
     HouseholdService? householdService,
-  })  : _transactionService = transactionService ?? TransactionService(),
-        _householdService = householdService ?? HouseholdService();
+  }) : _transactionService = transactionService ?? TransactionService(),
+       _householdService = householdService ?? HouseholdService();
 
   bool _isLoading = false;
   String? _error;
@@ -54,7 +54,9 @@ class TransactionsState extends ChangeNotifier {
       }
 
       // 2. Now we can safely fetch transactions
-      final result = await _transactionService.fetchTransactions(useCache: !force);
+      final result = await _transactionService.fetchTransactions(
+        useCache: !force,
+      );
       _transactions = result;
       // Sort by creation time (newest first)
       _transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -82,12 +84,13 @@ class TransactionsState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _transactionService.fetchTransactionsForAccountWithDateRange(
-        accountId,
-        dateFrom: dateFrom,
-        dateTo: dateTo,
-        useCache: !force,
-      );
+      final result = await _transactionService
+          .fetchTransactionsForAccountWithDateRange(
+            accountId,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            useCache: !force,
+          );
       _transactions = result;
       _transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
@@ -130,6 +133,7 @@ class TransactionsState extends ChangeNotifier {
     required String amount,
     required DateTime date,
     String? description,
+    String? householdId,
   }) async {
     await _transactionService.createTransaction(
       type: type,
@@ -138,6 +142,7 @@ class TransactionsState extends ChangeNotifier {
       amount: amount,
       date: date,
       description: description,
+      householdId: householdId,
     );
 
     await refresh();
@@ -152,6 +157,7 @@ class TransactionsState extends ChangeNotifier {
     required String amount,
     required DateTime date,
     String? description,
+    String? householdId,
   }) async {
     await _transactionService.updateTransaction(
       transactionId: transactionId,
@@ -161,6 +167,7 @@ class TransactionsState extends ChangeNotifier {
       amount: amount,
       date: date,
       description: description,
+      householdId: householdId,
     );
 
     await refresh();
@@ -181,6 +188,7 @@ class TransactionsState extends ChangeNotifier {
     String? description,
     String? categoryId,
     bool mustBeSameGroup = false,
+    String? householdId,
   }) async {
     await _transactionService.createTransfer(
       fromAccountId: fromAccountId,
@@ -190,6 +198,7 @@ class TransactionsState extends ChangeNotifier {
       description: description,
       categoryId: categoryId,
       mustBeSameGroup: mustBeSameGroup,
+      householdId: householdId,
     );
 
     await refresh();
@@ -200,4 +209,12 @@ class TransactionsState extends ChangeNotifier {
     await _transactionService.deleteTransfer(transferGroupId);
     await refresh();
   }
+
+    void clear() {
+    _transactions = [];
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
 }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../services/auth_service.dart';
 import '../storage/auth_storage.dart';
 import '../services/household_service.dart';
 import '../services/api_client.dart';
+import '../state/household_state.dart';
 import '../main.dart' as app;
 import 'sign_up_page.dart';
 
@@ -31,16 +34,18 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _showPasswordChangeDialog() async {
-    final dialogEmailController =
-        TextEditingController(text: _emailController.text.trim());
+    final dialogEmailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     bool oldPasswordObscured = true;
     bool newPasswordObscured = true;
     bool confirmPasswordObscured = true;
-    final formKey =
-        GlobalKey<FormState>(debugLabel: 'login_change_password_form');
+    final formKey = GlobalKey<FormState>(
+      debugLabel: 'login_change_password_form',
+    );
     String? dialogError;
     bool dialogLoading = false;
 
@@ -79,8 +84,9 @@ class _LoginPageState extends State<LoginPage> {
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content:
-                        Text('Password updated. Please sign in with the new password.'),
+                    content: Text(
+                      'Password updated. Please sign in with the new password.',
+                    ),
                   ),
                 );
               } catch (e) {
@@ -104,9 +110,7 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       TextFormField(
                         controller: dialogEmailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                        ),
+                        decoration: const InputDecoration(labelText: 'Email'),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Email is required';
@@ -200,10 +204,10 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 12),
                         Text(
                           dialogError!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: Theme.of(context).colorScheme.error),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                         ),
                       ],
                     ],
@@ -238,60 +242,71 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-  if (!(_formKey.currentState?.validate() ?? false)) {
-    return;
-  }
-
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
-
-  try {
-    // Clear cache when logging in with a new account
-    ApiClient.clearAllCache();
-    
-    // 1. Login to get token + user
-    final res = await _authService.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
-
-    await AuthStorage.saveLogin(
-      token: res.token,
-      name: res.user['name']?.toString() ?? '',
-      email: res.user['email']?.toString() ?? '',
-      userId: res.user['id']?.toString(),
-    );
-
-    // 2. Fetch households using Bearer token
-    final households = await _householdService.fetchHouseholds();
-    if (households.isEmpty) {
-      throw Exception('No households found for this user');
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
     }
 
-    // For now: pick the first household
-    await AuthStorage.setHouseholdId(households.first.id);
-
-    // 3. Go to RootPage (which contains the bottom navigation)
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const app.RootPage()),
-      (route) => false,
-    );
-  } catch (e) {
     setState(() {
-      _errorMessage = e.toString();
+      _isLoading = true;
+      _errorMessage = null;
     });
-  } finally {
-    if (mounted) {
+
+    try {
+      // Clear cache when logging in with a new account
+      ApiClient.clearAllCache();
+
+      // 1. Login to get token + user
+      final res = await _authService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      await AuthStorage.saveLogin(
+        token: res.token,
+        name: res.user['name']?.toString() ?? '',
+        email: res.user['email']?.toString() ?? '',
+        userId: res.user['id']?.toString(),
+      );
+
+      // 2. Fetch households using Bearer token
+      final households = await _householdService.fetchHouseholds();
+      if (households.isEmpty) {
+        throw Exception('No households found for this user');
+      }
+
+      final preferredHouseholdId = await AuthStorage.getPreferredHouseholdId();
+      var selectedHousehold = households.first;
+      if (preferredHouseholdId != null && preferredHouseholdId.isNotEmpty) {
+        selectedHousehold = households.firstWhere(
+          (h) => h.id == preferredHouseholdId,
+          orElse: () => selectedHousehold,
+        );
+      }
+
+      await AuthStorage.setHouseholdId(selectedHousehold.id);
+
+      if (mounted) {
+        await context.read<HouseholdState>().refresh();
+      }
+
+      // 3. Go to RootPage (which contains the bottom navigation)
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const app.RootPage()),
+        (route) => false,
+      );
+    } catch (e) {
       setState(() {
-        _isLoading = false;
+        _errorMessage = e.toString();
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -333,7 +348,9 @@ class _LoginPageState extends State<LoginPage> {
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -355,8 +372,8 @@ class _LoginPageState extends State<LoginPage> {
                     Text(
                       _errorMessage!,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   const SizedBox(height: 16),
                   SizedBox(

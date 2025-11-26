@@ -4,6 +4,10 @@ import '../services/auth_service.dart';
 import '../services/household_service.dart';
 import '../storage/auth_storage.dart';
 import '../main.dart' as app;
+import 'package:provider/provider.dart';
+import '../state/household_state.dart';
+import '../state/accounts_state.dart';
+import '../state/transactions_state.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -74,6 +78,17 @@ class _SignUpPageState extends State<SignUpPage> {
 
       // For now: pick the first household
       await AuthStorage.setHouseholdId(households.first.id);
+
+        // Refresh provider-backed state so the new household/account data is loaded
+      if (mounted) {
+        final householdState = context.read<HouseholdState>();
+        final accountsState = context.read<AccountsState>();
+        final txState = context.read<TransactionsState>();
+
+        await householdState.refresh();
+        await accountsState.refresh();
+        await txState.refresh();
+      }
 
       // 4. Go to main app
       if (!mounted) return;

@@ -4,16 +4,13 @@ import 'package:provider/provider.dart';
 import '../models/account_group.dart';
 import '../services/account_group_service.dart';
 import '../state/accounts_state.dart';
+import '../storage/include_totals_storage.dart';
 
 class AccountFormPage extends StatefulWidget {
   final AccountModel? account; // null for creating new account
   final String? groupId; // required for new account
 
-  const AccountFormPage({
-    super.key,
-    this.account,
-    this.groupId,
-  });
+  const AccountFormPage({super.key, this.account, this.groupId});
 
   @override
   State<AccountFormPage> createState() => _AccountFormPageState();
@@ -24,7 +21,7 @@ class _AccountFormPageState extends State<AccountFormPage> {
   final _nameController = TextEditingController();
   final _balanceController = TextEditingController();
   final AccountGroupService _accountGroupService = AccountGroupService();
-  
+
   String? _selectedGroupId;
   String _selectedCurrency = 'IDR';
   String _selectedScope = 'PERSONAL';
@@ -49,7 +46,8 @@ class _AccountFormPageState extends State<AccountFormPage> {
       _selectedScope = widget.account!.scope;
       _isArchived = widget.account!.isArchived;
       _includeInTotals = widget.account!.includeInTotals;
-      _selectedGroupId = widget.groupId; // This would need to be passed when editing
+      _selectedGroupId =
+          widget.groupId; // This would need to be passed when editing
     } else if (widget.groupId != null) {
       _selectedGroupId = widget.groupId;
       _balanceController.text = '0';
@@ -59,20 +57,30 @@ class _AccountFormPageState extends State<AccountFormPage> {
 
     // Load account groups
     try {
-      final groups = await _accountGroupService.fetchAccountGroups(useCache: true);
-      setState(() {
-        _accountGroups = groups;
-        _isLoadingGroups = false;
-        // If no group is selected and we have groups, select the first one
-        if (_selectedGroupId == null && groups.isNotEmpty) {
-          _selectedGroupId = groups.first.id;
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoadingGroups = false;
-      });
+      final groups = await _accountGroupService.fetchAccountGroups(
+        useCache: true,
+      );
+      final override = widget.account != null
+          ? await IncludeTotalsStorage.getOverride(widget.account!.id)
+          : null;
       if (mounted) {
+        setState(() {
+          _accountGroups = groups;
+          _isLoadingGroups = false;
+          if (override != null) {
+            _includeInTotals = override;
+          }
+          // If no group is selected and we have groups, select the first one
+          if (_selectedGroupId == null && groups.isNotEmpty) {
+            _selectedGroupId = groups.first.id;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingGroups = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load account groups: $e')),
         );
@@ -100,28 +108,30 @@ class _AccountFormPageState extends State<AccountFormPage> {
     try {
       if (!isEditing) {
         // Create new account
-        await accountsState.createAccount(
+        final created = await accountsState.createAccount(
           name: _nameController.text,
           groupId: _selectedGroupId!,
           currency: _selectedCurrency,
-          startingBalance:
-              _balanceController.text.isEmpty ? '0' : _balanceController.text,
+          startingBalance: _balanceController.text.isEmpty
+              ? '0'
+              : _balanceController.text,
           isArchived: _isArchived,
           scope: _selectedScope,
           includeInTotals: _includeInTotals,
         );
+        await IncludeTotalsStorage.setOverride(created.id, _includeInTotals);
       } else {
         // Update existing account
-        await accountsState.updateAccount(
+        final updated = await accountsState.updateAccount(
           accountId: widget.account!.id,
           name: _nameController.text,
           currency: _selectedCurrency,
           isArchived: _isArchived,
           scope: _selectedScope,
-          startingBalance:
-              _balanceController.text.isEmpty ? '0' : _balanceController.text,
+          startingBalance: '',
           includeInTotals: _includeInTotals,
         );
+        await IncludeTotalsStorage.setOverride(updated.id, _includeInTotals);
       }
 
       if (mounted) {
@@ -129,9 +139,9 @@ class _AccountFormPageState extends State<AccountFormPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -158,15 +168,23 @@ class _AccountFormPageState extends State<AccountFormPage> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: Text('Delete Account', style: Theme.of(context).textTheme.headlineLarge),
-                    content: Text('Are you sure you want to delete this account?', style: Theme.of(context).textTheme.titleLarge),
+                    title: Text(
+                      'Delete Account',
+                      style: Theme.of(context).textTheme.headlineLarge,
+                    ),
+                    content: Text(
+                      'Are you sure you want to delete this account?',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     backgroundColor: Theme.of(context).colorScheme.surface,
-                    titleTextStyle: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    contentTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                    titleTextStyle: Theme.of(context).textTheme.headlineLarge
+                        ?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                    contentTextStyle: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
@@ -188,14 +206,17 @@ class _AccountFormPageState extends State<AccountFormPage> {
                   try {
                     final accountsState = context.read<AccountsState>();
                     await accountsState.deleteAccount(widget.account!.id);
+                    await IncludeTotalsStorage.removeOverride(
+                      widget.account!.id,
+                    );
                     if (mounted) {
                       Navigator.of(context).pop(true);
                     }
                   } catch (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
                     }
                   } finally {
                     if (mounted) {
@@ -242,7 +263,10 @@ class _AccountFormPageState extends State<AccountFormPage> {
                         items: _accountGroups.map((group) {
                           return DropdownMenuItem(
                             value: group.id,
-                            child: Text(group.name, style: Theme.of(context).textTheme.bodyMedium),
+                            child: Text(
+                              group.name,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -265,7 +289,9 @@ class _AccountFormPageState extends State<AccountFormPage> {
                         labelText: 'Starting Balance',
                         border: OutlineInputBorder(),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a balance';
@@ -284,10 +310,34 @@ class _AccountFormPageState extends State<AccountFormPage> {
                         border: OutlineInputBorder(),
                       ),
                       items: [
-                        DropdownMenuItem(value: 'IDR', child: Text('IDR', style: Theme.of(context).textTheme.bodyMedium)),
-                        DropdownMenuItem(value: 'USD', child: Text('USD', style: Theme.of(context).textTheme.bodyMedium)),
-                        DropdownMenuItem(value: 'EUR', child: Text('EUR', style: Theme.of(context).textTheme.bodyMedium)),
-                        DropdownMenuItem(value: 'SGD', child: Text('SGD', style: Theme.of(context).textTheme.bodyMedium)),
+                        DropdownMenuItem(
+                          value: 'IDR',
+                          child: Text(
+                            'IDR',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'USD',
+                          child: Text(
+                            'USD',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'EUR',
+                          child: Text(
+                            'EUR',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'SGD',
+                          child: Text(
+                            'SGD',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -303,8 +353,20 @@ class _AccountFormPageState extends State<AccountFormPage> {
                         border: OutlineInputBorder(),
                       ),
                       items: [
-                        DropdownMenuItem(value: 'PERSONAL', child: Text('Personal', style: Theme.of(context).textTheme.bodyMedium)),
-                        DropdownMenuItem(value: 'HOUSEHOLD', child: Text('Household', style: Theme.of(context).textTheme.bodyMedium)),
+                        DropdownMenuItem(
+                          value: 'PERSONAL',
+                          child: Text(
+                            'Personal',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'HOUSEHOLD',
+                          child: Text(
+                            'Household',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
@@ -315,7 +377,10 @@ class _AccountFormPageState extends State<AccountFormPage> {
                     ),
                     const SizedBox(height: 16),
                     SwitchListTile.adaptive(
-                      title: Text('Add to totals', style: Theme.of(context).textTheme.bodyMedium),
+                      title: Text(
+                        'Add to totals',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                       subtitle: Text(
                         'Disable to exclude this account from the Assets bar and group totals.',
                         style: Theme.of(context).textTheme.bodySmall,
@@ -330,7 +395,10 @@ class _AccountFormPageState extends State<AccountFormPage> {
                     ),
                     const SizedBox(height: 8),
                     CheckboxListTile(
-                      title: Text('Archived', style: Theme.of(context).textTheme.bodyMedium),
+                      title: Text(
+                        'Archived',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                       value: _isArchived,
                       onChanged: (value) {
                         setState(() {

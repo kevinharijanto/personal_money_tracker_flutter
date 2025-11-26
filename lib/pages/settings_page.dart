@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemChrome;
 import 'package:provider/provider.dart';
 import '../storage/auth_storage.dart';
 import '../providers/theme_provider.dart';
 import 'category_management_page.dart';
 import 'account_group_management_page.dart';
-import 'accounts_page.dart';
 import 'login_page.dart';
+import 'household_invitations_page.dart';
 import '../state/accounts_state.dart';
+import '../state/household_state.dart';
 import '../services/auth_service.dart';
+import '../models/household.dart';
+import '../state/transactions_state.dart';
+import '../storage/include_totals_storage.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -59,6 +62,58 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadDarkModePreference();
   }
 
+  Future<void> _showRenameHouseholdDialog(Household household) async {
+    final controller = TextEditingController(text: household.name);
+    try {
+      final newName = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Rename Household'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(labelText: 'Household Name'),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(controller.text.trim()),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (newName == null) return;
+      final trimmed = newName.trim();
+      if (trimmed.isEmpty || trimmed == household.name) return;
+
+      try {
+        await context.read<HouseholdState>().renameHousehold(
+          householdId: household.id,
+          newName: trimmed,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Household name updated.')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to rename household: $e')),
+        );
+      }
+    } finally {
+      controller.dispose();
+    }
+  }
+
   Future<void> _loadCurrentTimezone() async {
     final savedTimezone = await AuthStorage.getTimezone();
     if (savedTimezone != null && savedTimezone.isNotEmpty) {
@@ -98,7 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // Use the ThemeProvider to toggle the theme
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     await themeProvider.toggleTheme();
-    
+
     // Update local state to match
     setState(() {
       _isDarkMode = themeProvider.isDarkMode;
@@ -106,8 +161,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _logout() async {
+    context.read<AccountsState>().clear();
+    context.read<TransactionsState>().clear();
+    context.read<HouseholdState>().clear();
+
     await AuthStorage.clear();
+    await IncludeTotalsStorage.clear();
+
     if (!mounted) return;
+    
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (route) => false,
@@ -121,8 +183,9 @@ class _SettingsPageState extends State<SettingsPage> {
     bool oldPasswordObscured = true;
     bool newPasswordObscured = true;
     bool confirmPasswordObscured = true;
-    final formKey =
-        GlobalKey<FormState>(debugLabel: 'settings_change_password_form');
+    final formKey = GlobalKey<FormState>(
+      debugLabel: 'settings_change_password_form',
+    );
     String? dialogError;
     bool dialogLoading = false;
 
@@ -156,7 +219,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (!mounted) return;
                 Navigator.of(dialogContext).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password updated successfully.')),
+                  const SnackBar(
+                    content: Text('Password updated successfully.'),
+                  ),
                 );
               } catch (e) {
                 setDialogState(() {
@@ -262,10 +327,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 12),
                         Text(
                           dialogError!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: Theme.of(context).colorScheme.error),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                         ),
                       ],
                     ],
@@ -310,301 +375,427 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_isDarkMode != themeProvider.isDarkMode) {
           _isDarkMode = themeProvider.isDarkMode;
         }
-        
+
         return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // User info card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Welcome, $name',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  if (email.isNotEmpty)
-                    Text(
-                      email,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Security',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Keep your account secure by updating your password regularly.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[600],
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // User info card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, $name',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      if (email.isNotEmpty)
+                        Text(
+                          email,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                         ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    leading: Icon(
-                      Icons.password,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text('Change Password', style: Theme.of(context).textTheme.bodyMedium),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: _showSettingsPasswordDialog,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Timezone',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Select your timezone to ensure dates and times are displayed correctly.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _currentTimezone,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                    ),
-                    isExpanded: true,
-                    items: _timezones.map((tz) {
-                      return DropdownMenuItem<String>(
-                        value: tz['value']!,
-                        child: Text(
-                          tz['label']!,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        _saveTimezone(value!);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Current: ${_timezones.firstWhere((tz) => tz['value'] == _currentTimezone)['label'] ?? 'Unknown'}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Category Management',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Manage your income and expense categories.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    leading: Icon(
-                      Icons.trending_up,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                    title: Text('Income Category Setting', style: Theme.of(context).textTheme.bodyMedium),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CategoryManagementPage(
-                            categoryType: 'INCOME',
-                            title: 'Income Categories',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: Icon(
-                      Icons.trending_down,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    title: Text('Expenses Category Setting', style: Theme.of(context).textTheme.bodyMedium),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CategoryManagementPage(
-                            categoryType: 'EXPENSE',
-                            title: 'Expense Categories',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Account Group Management',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Manage your account groups (Bank Accounts, Cash, Credit Cards, etc.).',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    leading: Icon(
-                      Icons.account_balance,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text('Account Groups', style: Theme.of(context).textTheme.bodyMedium),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () async {
-                      final result = await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AccountGroupManagementPage(),
-                        ),
-                      );
-                      // After returning from account group management, refresh accounts page
-                      if (mounted) {
-                        // Use AccountsState to refresh accounts
-                        final accountsState = context.read<AccountsState>();
-                        await accountsState.refresh();
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Appearance',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Toggle dark mode for better viewing experience.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: Text('Dark Mode', style: Theme.of(context).textTheme.bodyMedium),
-                    subtitle: Text(themeProvider.isDarkMode ? 'Currently enabled' : 'Currently disabled'),
-                    value: themeProvider.isDarkMode,
-                    onChanged: (value) {
-                      _toggleDarkMode();
-                    },
-                    secondary: Icon(themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'About',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Personal Money Tracker v1.0.0',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'A simple app to track your income, expenses, and account balances.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _logout,
-              icon: const Icon(Icons.logout),
-              label: const Text('Log Out'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+              Consumer<HouseholdState>(
+                builder: (context, householdState, _) {
+                  final households = householdState.households;
+                  final selectedId = householdState.selectedHouseholdId; // 👈 current household
+
+                  if (households.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your Households',
+                            style: Theme.of(context).textTheme.headlineLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Rename your current household or others you are a member of.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.grey[600]),
+                          ),
+                          const SizedBox(height: 16),
+                          ...households.map((h) {
+                            final isCurrent = h.id == selectedId;
+                            final subtitleText = isCurrent
+                                ? 'This is your current household'
+                                : 'Other household';
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                h.name,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              subtitle: Text(
+                                subtitleText,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.grey[600]),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => _showRenameHouseholdDialog(h),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Security',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Keep your account secure by updating your password regularly.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        leading: Icon(
+                          Icons.password,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: Text(
+                          'Change Password',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: _showSettingsPasswordDialog,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Timezone',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Select your timezone to ensure dates and times are displayed correctly.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _currentTimezone,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 16,
+                          ),
+                        ),
+                        isExpanded: true,
+                        items: _timezones.map((tz) {
+                          return DropdownMenuItem<String>(
+                            value: tz['value']!,
+                            child: Text(
+                              tz['label']!,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            _saveTimezone(value!);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Current: ${_timezones.firstWhere((tz) => tz['value'] == _currentTimezone)['label'] ?? 'Unknown'}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Category Management',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Manage your income and expense categories.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        leading: Icon(
+                          Icons.trending_up,
+                          color: Theme.of(context).colorScheme.tertiary,
+                        ),
+                        title: Text(
+                          'Income Category Setting',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const CategoryManagementPage(
+                                categoryType: 'INCOME',
+                                title: 'Income Categories',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(),
+                      ListTile(
+                        leading: Icon(
+                          Icons.trending_down,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        title: Text(
+                          'Expenses Category Setting',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const CategoryManagementPage(
+                                categoryType: 'EXPENSE',
+                                title: 'Expense Categories',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Household Invitations',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Invite others to your household or accept invitations you have received.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        leading: Icon(
+                          Icons.group_add,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: Text(
+                          'Manage Invitations',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const HouseholdInvitationsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Account Group Management',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Manage your account groups (Bank Accounts, Cash, Credit Cards, etc.).',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        leading: Icon(
+                          Icons.account_balance,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: Text(
+                          'Account Groups',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const AccountGroupManagementPage(),
+                            ),
+                          );
+                          // After returning from account group management, refresh accounts page
+                          if (mounted) {
+                            // Use AccountsState to refresh accounts
+                            final accountsState = context.read<AccountsState>();
+                            await accountsState.refresh();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Appearance',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Toggle dark mode for better viewing experience.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: Text(
+                          'Dark Mode',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        subtitle: Text(
+                          themeProvider.isDarkMode
+                              ? 'Currently enabled'
+                              : 'Currently disabled',
+                        ),
+                        value: themeProvider.isDarkMode,
+                        onChanged: (value) {
+                          _toggleDarkMode();
+                        },
+                        secondary: Icon(
+                          themeProvider.isDarkMode
+                              ? Icons.dark_mode
+                              : Icons.light_mode,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'About',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Personal Money Tracker v1.0.0',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'A simple app to track your income, expenses, and account balances.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Log Out'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );

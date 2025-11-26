@@ -32,6 +32,7 @@ class AccountService {
       'scope': scope,
       'ownerUserId': ownerUserId,
       'includeInTotals': includeInTotals,
+      'include_in_totals': includeInTotals,
     };
 
     final res = await ApiClient.post('/api/accounts', body);
@@ -62,7 +63,10 @@ class AccountService {
       if (isArchived != null) 'isArchived': isArchived,
       if (scope != null) 'scope': scope,
       if (startingBalance != null) 'startingBalance': startingBalance,
-      if (includeInTotals != null) 'includeInTotals': includeInTotals,
+      if (includeInTotals != null) ...{
+        'includeInTotals': includeInTotals,
+        'include_in_totals': includeInTotals,
+      },
     };
 
     final res = await ApiClient.put('/api/accounts/$accountId', body);
@@ -79,12 +83,8 @@ class AccountService {
 
   /// PUT /api/accounts/reorder
   /// body: { "accountIds": ["id1", "id2", "id3"] }
-  Future<void> reorderAccounts({
-    required List<String> accountIds,
-  }) async {
-    final body = {
-      'accountIds': accountIds,
-    };
+  Future<void> reorderAccounts({required List<String> accountIds}) async {
+    final body = {'accountIds': accountIds};
 
     await ApiClient.put('/api/accounts/reorder', body);
   }
